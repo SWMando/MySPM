@@ -1,0 +1,4 @@
+argon2_cffi
+cryptography
+tabulate
+pyperclip
