@@ -6,6 +6,7 @@ import base64
 import getpass # https://www.geeksforgeeks.org/python/getpass-and-getuser-in-python-password-without-echo/
 import platform
 import pyperclip
+import logging
 import sqlite3 # https://www.geeksforgeeks.org/python/python-sqlite-cursor-object/
 from tabulate import tabulate
 import argon2
@@ -95,6 +96,7 @@ class DB:
 #                c.execute('''DELETE FROM sqlite_sequence WHERE name = ?''', ("logins",))
 #            conn.commit()
 
+#logging.basicConfig(format="{levelname}")
 db = DB()
 
 # code snipplet taken from https://hackernoon.com/argon2-in-practice-how-to-implement-secure-password-hashing-in-your-application
