@@ -26,7 +26,8 @@ find_opt = {
 find_action = {
     "1": "Copy password",
     "2": "Delete login",
-    "3": "Edit Login"
+    "3": "Edit Login",
+    ".": "To leave press"
 }
 edit_msg = """Please enter only the parts which you wish to change.\nIf you do not want to change somefield, just leave it empty"""
 opt = {
@@ -184,6 +185,8 @@ def create_login(user_id, key):
             site = input("Please enter the site: ")
             username = input("Please enter the username: ")
             length = input("Please enter password length(10-26): ")
+            if length == "":
+                length = 10
             password = password_gen(int(length))
             # Fernet algorythm code snipplet reference: https://cryptography.io/en/latest/fernet/#using-passwords-with-fernet
             # https://stackoverflow.com/questions/27335726/how-do-i-encrypt-and-decrypt-a-string-in-python
@@ -191,16 +194,16 @@ def create_login(user_id, key):
             password_encr = f.encrypt(password.encode())
             db.run_change('''INSERT INTO logins (user_id, entity_name, site_name, username, password_encr) VALUES (?, ?, ?, ?, ?)''', params=(user_id, entity_name, site, username, password_encr))
             break
+        except ValueError:
+            clear()
+            input("Please enter an integer to choose the length for the password... ")
         except sqlite3.IntegrityError:
             clear()
             input("Entered Entity Name is already used. Please try to use something different! ")
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError):
             clear()
             break
             input("Please press enter to continue... ")
-        except EOFError:
-            clear()
-            exit()
 
 
 def copy_login(key, password_encr):
@@ -212,18 +215,23 @@ def copy_login(key, password_encr):
         time.sleep(8)
         pyperclip.copy('')
     except KeyboardInterrupt:
+        pyperclip.copy('')
         input("Please press enter to continue... ")
 
 
 def delete_login(entity_name):
     clear()
     ays = input("Are you sure that you want to delete this? Ones deleted, you will not be able to recover this(y/n): ")
-    if ays == "n":
+    if ays.lower() == "y":
+        enterDELETE = input("Please enter \"DELETE\": ")
+        if enterDELETE == "DELETE":
+            db.run_change('''DELETE FROM logins WHERE entity_name = ?''', params=(entity_name,))
         return
-    db.run_change('''DELETE FROM logins WHERE entity_name = ?''', params=(entity_name,))
+    return
 
 
 def edit_login(key, entity_name):
+    clear()
     print(edit_msg)
     new_entity_name = input("Entity Name: ")
     new_site = input("Site: ")
@@ -297,10 +305,16 @@ def find_login(key):
                 case ".":
                     break
                 case _:
+                    clear()
                     input("Please choose an option!!! ")
+        except IndexError:
+            clear()
+            input("It seems entered label does not exist... ")
         except KeyboardInterrupt:
             break
-
+        except ValueError:
+            clear()
+            input("Please enter an integer to choose the length for the password... ")
 
 
 def master_auth():
@@ -328,7 +342,11 @@ def main():
         print("Please create a Master User")
         create_master_user()
         clear()
-    user_id, encr_key = master_auth()
+    try:
+        user_id, encr_key = master_auth()
+    except (KeyboardInterrupt, EOFError):
+        clear()
+        exit()
     while True:
         clear()
         print(welcome_msg)
@@ -351,7 +369,7 @@ def main():
                 break
             case _:
                 clear()
-                input("You have to choose smth")
+                input("You have to choose smth... ")
 
 
 if __name__ == "__main__":
