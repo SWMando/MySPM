@@ -186,8 +186,10 @@ def create_login(user_id, key):
             entity_name = input("Please give a short and unique name for the entry: ")
             site = input("Please enter the site: ")
             username = input("Please enter the username: ")
-            length = input("Please enter password length(10-26): ")
+            length = input("Please enter password length(10-22): ")
             if length == "":
+                length = 10
+            if int(length) < 10 or int(length) > 22:
                 length = 10
             password = password_gen(int(length))
             # Fernet algorythm code snipplet reference: https://cryptography.io/en/latest/fernet/#using-passwords-with-fernet
