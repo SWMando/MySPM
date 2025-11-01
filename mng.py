@@ -1,4 +1,5 @@
 import os
+import re
 import string
 import secrets
 import time
@@ -36,6 +37,17 @@ opt = {
     "2": "Find Login",
     ".": "To leave press"
 }
+
+# For Input Sanitization
+MAX_USERNAME = 64
+MAX_ENTITY_NAME = 64
+MAX_SITE_NAME = 253
+MAX_MASTER_PASSWORD= 64
+
+ENTITY_RE = re.compile(r"^[A-Za-z0-9_\-\. ]{1,%d}$" % MAX_ENTITY_NAME)   # letters, digits, _, -, ., space
+SITE_RE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")  # basic domain check
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_.@+\-]{1,%d}$" % MAX_USERNAME)  # allow email like chars
+
 
 # For Argon2ID
 time_cost = 2          # Number of iterations
@@ -118,11 +130,97 @@ def hash_password(password):
 #---------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------
+class EmptyInput(Exception):
+    def __init__(self):
+        self.message = "Error Emptry Input! Please enter something!"
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.message}"
+
+class LongEntityName(Exception):
+    def __init__(self):
+        self.message = f"Error Long Input! Your input exceeds the limit of {MAX_ENTITY_NAME}!"
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.message}"
+
+class LongSiteName(Exception):
+    def __init__(self):
+        self.message = f"Error Long Input! Your input exceeds the limit of {MAX_SITE_NAME}!"
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.message}"
+
+class LongUsername(Exception):
+    def __init__(self):
+        self.message = f"Error Long Input! Your input exceeds the limit of {MAX_USERNAME}!"
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.message}"
+
+class LongMasterPassword(Exception):
+    def __init__(self):
+        self.message = f"Error Long Input! Your input exceeds the limit of {MAX_MASTER_PASSWORD}!"
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.message}"
+
+#---------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------
 def clear():
     if platform.system() == "Windows":
         os.system("cls")
     else:
         os.system("clear")
+
+
+def entity_name_sanitize(userinput: str):
+    if userinput == "":
+        raise EmptyInput()
+    if len(userinput) > MAX_ENTITY_NAME:
+        raise LongEntityName()
+    if re.search(ENTITY_RE, userinput) is None:
+        raise re.error("Invalid Entity Name: contains disallowed characters!")
+    return userinput
+
+
+def site_sanitize(userinput: str):
+    if userinput == "":
+        raise EmptyInput()
+    if len(userinput) > MAX_SITE_NAME:
+        raise LongSiteName()
+    if re.search(SITE_RE, userinput) is None:
+        raise re.error("Invalid Entity Name: contains disallowed characters!")
+
+    return userinput
+
+
+def username_sanitize(userinput: str):
+    if userinput == "":
+        raise EmptyInput()
+    if len(userinput) > MAX_USERNAME:
+        raise LongUserName()
+    if re.search(USERNAME_RE, userinput) is None:
+        raise re.error("Invalid Entity Name: contains disallowed characters!")
+
+    return userinput
+
+
+def password_sanitize(userinput: str):
+    if userinput == "":
+        raise EmptyInput()
+    if len(username) > MAX_MASTER_PASSWORD:
+        raise LongMasterPassword()
+    #if re.search(ENTITY_RE, userinput) is None:
+    #    raise re.error("Invalid Entity Name: contains disallowed characters!")
+
+    return userinput
 
 
 def check_master_user():
@@ -136,9 +234,9 @@ def check_master_user():
 def create_master_user():
     username = input("Please enter your username: ")
     password = input("Please enter your password: ")
-    password_hash = hash_password(password)
+    password_hash = hash_password(password.strip())
     salt = os.urandom(16)
-    db.run_change('''INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?) ''', params=(username, password_hash, salt))
+    db.run_change('''INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?) ''', params=(username.strip(), password_hash, salt))
 
 
 def derive_key(username, password):
@@ -183,10 +281,10 @@ def create_login(user_id, key):
         clear()
         try:
             print(f"{guide}\n")
-            entity_name = input("Please give a short and unique name for the entry: ")
-            site = input("Please enter the site: ")
-            username = input("Please enter the username: ")
-            length = input("Please enter password length(10-22): ")
+            entity_name = input("Please give a short and unique name for the entry: ").strip()
+            site = input("Please enter the site: ").strip()
+            username = input("Please enter the username: ").strip()
+            length = input("Please enter password length(10-22): ").strip()
             if length == "":
                 length = 10
             if int(length) < 10 or int(length) > 22:
@@ -196,7 +294,10 @@ def create_login(user_id, key):
             # https://stackoverflow.com/questions/27335726/how-do-i-encrypt-and-decrypt-a-string-in-python
             f = Fernet(base64.urlsafe_b64encode(key))
             password_encr = f.encrypt(password.encode())
-            db.run_change('''INSERT INTO logins (user_id, entity_name, site_name, username, password_encr) VALUES (?, ?, ?, ?, ?)''', params=(user_id, entity_name, site, username, password_encr))
+            entity_name_sanitized = entity_name_sanitize(entity_name)
+            site_sanitized = site_sanitize(site)
+            username_sanitized = username_sanitize(username)
+            db.run_change('''INSERT INTO logins (user_id, entity_name, site_name, username, password_encr) VALUES (?, ?, ?, ?, ?)''', params=(user_id, entity_name_sanitized, site_sanitized, username_sanitized, password_encr))
             break
         except ValueError:
             clear()
@@ -204,10 +305,31 @@ def create_login(user_id, key):
         except sqlite3.IntegrityError:
             clear()
             input("Entered Entity Name is already used. Please try to use something different! ")
-        except (KeyboardInterrupt, EOFError):
+        except KeyboardInterrupt:
+            clear()
+            break
+        except EOFError:
             clear()
             break
             input("Please press enter to continue... ")
+        except MemoryError:
+            clear()
+            input(f"Memory Overload Error! Please press enter to continue... ")
+        except (EmptyInput) as e:
+            clear()
+            input(f"{e}. Please press enter to continue... ")
+        except (LongEntityName) as e:
+            clear()
+            input(f"{e}. Please press enter to continue... ")
+        except (LongSiteName) as e:
+            clear()
+            input(f"{e}. Please press enter to continue... ")
+        except (LongUsername) as e:
+            clear()
+            input(f"{e}. Please press enter to continue... ")
+        except re.PatternError as e:
+            clear()
+            input(f"{e}. Please press enter to continue... ")
 
 
 def copy_login(key, password_encr):
@@ -237,10 +359,10 @@ def delete_login(entity_name):
 def edit_login(key, entity_name):
     clear()
     print(edit_msg)
-    new_entity_name = input("Entity Name: ")
-    new_site = input("Site: ")
-    new_username = input("Username: ")
-    new_password_len = input("Password Length: ")
+    new_entity_name = input("Entity Name: ").strip()
+    new_site = input("Site: ").strip()
+    new_username = input("Username: ").strip()
+    new_password_len = input("Password Length: ").strip()
 
     ays = input("Are you sure that you want to apply these changes? Ones applied, you will not be able to revert this(y/n): ")
     if ays == "n":
@@ -364,7 +486,6 @@ def main():
             case "1":
                 clear()
                 create_login(user_id, encr_key)
-                input("Please press enter to continue... ")
             case "2":
                 clear()
                 find_login(encr_key)
