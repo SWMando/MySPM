@@ -232,11 +232,16 @@ def check_master_user():
 
 
 def create_master_user():
-    username = input("Please enter your username: ")
-    password = input("Please enter your password: ")
-    password_hash = hash_password(password.strip())
-    salt = os.urandom(16)
-    db.run_change('''INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?) ''', params=(username.strip(), password_hash, salt))
+    try:
+        username = input("Please enter your username: ")
+        password = input("Please enter your password: ")
+        password_hash = hash_password(password.strip())
+        salt = os.urandom(16)
+        db.run_change('''INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?) ''', params=(username.strip(), password_hash, salt))
+    except (KeyboardInterrupt, EOFError):
+        clear()
+        print("Leaving the program")
+        exit()
 
 
 def derive_key(username, password):
@@ -305,6 +310,10 @@ def create_login(user_id, key):
         except sqlite3.IntegrityError:
             clear()
             input("Entered Entity Name is already used. Please try to use something different! ")
+        except sqlite3.OperationalError:
+            clear()
+            print("Please check the if the Vault was altered! It seems that it was removed")
+            exit()
         except KeyboardInterrupt:
             clear()
             break
@@ -347,38 +356,49 @@ def copy_login(key, password_encr):
 
 def delete_login(entity_name):
     clear()
-    ays = input("Are you sure that you want to delete this? Ones deleted, you will not be able to recover this(y/n): ")
-    if ays.lower() == "y":
-        enterDELETE = input("Please enter \"DELETE\": ")
-        if enterDELETE == "DELETE":
-            db.run_change('''DELETE FROM logins WHERE entity_name = ?''', params=(entity_name,))
+    try:
+        ays = input("Are you sure that you want to delete this? Ones deleted, you will not be able to recover this(y/n): ")
+        if ays.lower() == "y":
+            enterDELETE = input("Please enter \"DELETE\": ")
+            if enterDELETE == "DELETE":
+                db.run_change('''DELETE FROM logins WHERE entity_name = ?''', params=(entity_name,))
+            return
         return
-    return
+    except sqlite3.OperationalError:
+        clear()
+        print("Please check the if the Vault was altered! It seems that it was removed")
+        exit()
+
 
 
 def edit_login(key, entity_name):
-    clear()
-    print(edit_msg)
-    new_entity_name = input("Entity Name: ").strip()
-    new_site = input("Site: ").strip()
-    new_username = input("Username: ").strip()
-    new_password_len = input("Password Length: ").strip()
+    try:
+        clear()
+        print(edit_msg)
+        new_entity_name = input("Entity Name: ").strip()
+        new_site = input("Site: ").strip()
+        new_username = input("Username: ").strip()
+        new_password_len = input("Password Length: ").strip()
 
-    ays = input("Are you sure that you want to apply these changes? Ones applied, you will not be able to revert this(y/n): ")
-    if ays == "n":
-        return
+        ays = input("Are you sure that you want to apply these changes? Ones applied, you will not be able to revert this(y/n): ")
+        if ays == "n":
+            return
 
-    if new_entity_name != "":
-        db.run_change('''UPDATE logins SET entity_name = ? WHERE entity_name = ?''', params=(new_entity_name, entity_name))
-    if new_site != "":
-        db.run_change('''UPDATE logins SET site_name = ? WHERE entity_name = ?''', params=(new_site, entity_name))
-    if new_username != "":
-        db.run_change('''UPDATE logins SET username = ? WHERE entity_name = ?''', params=(new_username, entity_name))
-    if new_password_len != "":
-        password = password_gen(int(new_password_len))
-        f = Fernet(base64.urlsafe_b64encode(key))
-        password_encr = f.encrypt(password.encode())
-        db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
+        if new_entity_name != "":
+            db.run_change('''UPDATE logins SET entity_name = ? WHERE entity_name = ?''', params=(new_entity_name, entity_name))
+        if new_site != "":
+            db.run_change('''UPDATE logins SET site_name = ? WHERE entity_name = ?''', params=(new_site, entity_name))
+        if new_username != "":
+            db.run_change('''UPDATE logins SET username = ? WHERE entity_name = ?''', params=(new_username, entity_name))
+        if new_password_len != "":
+            password = password_gen(int(new_password_len))
+            f = Fernet(base64.urlsafe_b64encode(key))
+            password_encr = f.encrypt(password.encode())
+            db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
+    except sqlite3.OperationalError:
+        clear()
+        print("Please check the if the Vault was altered! It seems that it was removed")
+        exit()
 
 
 def find_login(key):
@@ -441,6 +461,10 @@ def find_login(key):
         except ValueError:
             clear()
             input("Please enter an integer to choose the length for the password... ")
+        except sqlite3.OperationalError:
+            clear()
+            print("Please check the if the Vault was altered! It seems that it was removed")
+            exit()
 
 
 def master_auth():
@@ -475,26 +499,31 @@ def main():
         exit()
     while True:
         clear()
-        print(welcome_msg)
-        for key,val in opt.items():
-            if key == ".":
-                print(f"\n{val} {key}\n")
-            else:
-                print(f"{key}. {val}")
-        choice = input("Please choose: ")
-        match choice:
-            case "1":
-                clear()
-                create_login(user_id, encr_key)
-            case "2":
-                clear()
-                find_login(encr_key)
-            case ".":
-                clear()
-                break
-            case _:
-                clear()
-                input("You have to choose smth... ")
+        try:
+            print(welcome_msg)
+            for key,val in opt.items():
+                if key == ".":
+                    print(f"\n{val} {key}\n")
+                else:
+                    print(f"{key}. {val}")
+            choice = input("Please choose: ")
+            match choice:
+                case "1":
+                    clear()
+                    create_login(user_id, encr_key)
+                case "2":
+                    clear()
+                    find_login(encr_key)
+                case ".":
+                    clear()
+                    break
+                case _:
+                    clear()
+                    input("You have to choose smth... ")
+        except (KeyboardInterrupt, EOFError):
+            clear()
+            print("Leaving the program")
+            exit()
 
 
 if __name__ == "__main__":
