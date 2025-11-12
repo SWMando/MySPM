@@ -1,8 +1,10 @@
 import os
+import sys
 import re
 import string
 import secrets
 import time
+import threading
 import base64
 import getpass # https://www.geeksforgeeks.org/python/getpass-and-getuser-in-python-password-without-echo/
 import platform
@@ -47,6 +49,8 @@ MAX_MASTER_PASSWORD= 64
 ENTITY_RE = re.compile(r"^[A-Za-z0-9_\-\. ]{1,%d}$" % MAX_ENTITY_NAME)   # letters, digits, _, -, ., space
 SITE_RE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")  # basic domain check
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.@+\-]{1,%d}$" % MAX_USERNAME)  # allow email like chars
+
+# Time limit for the app
 
 
 # For Argon2ID
@@ -180,6 +184,8 @@ def clear():
         os.system("clear")
 
 
+#def session_limit():
+
 def entity_name_sanitize(userinput: str):
     if userinput == "":
         raise EmptyInput()
@@ -241,7 +247,7 @@ def create_master_user():
     except (KeyboardInterrupt, EOFError):
         clear()
         print("Leaving the program")
-        exit()
+        sys.exit(0)
 
 
 def derive_key(username, password):
@@ -313,7 +319,7 @@ def create_login(user_id, key):
         except sqlite3.OperationalError:
             clear()
             print("Please check the if the Vault was altered! It seems that it was removed")
-            exit()
+            sys.exit(0)
         except KeyboardInterrupt:
             clear()
             break
@@ -349,7 +355,7 @@ def copy_login(key, password_encr):
         print("Password copied!")
         time.sleep(8)
         pyperclip.copy('')
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         pyperclip.copy('')
         input("Please press enter to continue... ")
 
@@ -367,7 +373,7 @@ def delete_login(entity_name):
     except sqlite3.OperationalError:
         clear()
         print("Please check the if the Vault was altered! It seems that it was removed")
-        exit()
+        sys.exit(1)
 
 
 
@@ -398,7 +404,7 @@ def edit_login(key, entity_name):
     except sqlite3.OperationalError:
         clear()
         print("Please check the if the Vault was altered! It seems that it was removed")
-        exit()
+        sys.exit(1)
 
 
 def find_login(key):
@@ -464,7 +470,7 @@ def find_login(key):
         except sqlite3.OperationalError:
             clear()
             print("Please check the if the Vault was altered! It seems that it was removed")
-            exit()
+            sys.exit(1)
 
 
 def master_auth():
@@ -485,45 +491,57 @@ def master_auth():
             input("Password is incorrect. Please try again... ")
 
 
+def session_limit(timeout):
+    
+
 def main():
-    clear()
-    master_exists = check_master_user()
-    if master_exists is False:
-        print("Please create a Master User")
-        create_master_user()
-        clear()
-    try:
-        user_id, encr_key = master_auth()
-    except (KeyboardInterrupt, EOFError):
-        clear()
-        exit()
     while True:
         clear()
+        master_exists = check_master_user()
+        if master_exists is False:
+            print("Please create a Master User")
+            create_master_user()
+            clear()
         try:
-            print(welcome_msg)
-            for key,val in opt.items():
-                if key == ".":
-                    print(f"\n{val} {key}\n")
-                else:
-                    print(f"{key}. {val}")
-            choice = input("Please choose: ")
-            match choice:
-                case "1":
-                    clear()
-                    create_login(user_id, encr_key)
-                case "2":
-                    clear()
-                    find_login(encr_key)
-                case ".":
-                    clear()
-                    break
-                case _:
-                    clear()
-                    input("You have to choose smth... ")
+            user_id, encr_key = master_auth()
         except (KeyboardInterrupt, EOFError):
             clear()
-            print("Leaving the program")
-            exit()
+            sys.exit(0)
+
+        SESSION_TIMEOUT = 10
+        START_TIME = time.time()
+
+        while True:
+            clear()
+            if time.time() - START_TIME > SESSION_TIMEOUT:
+                clear()
+                input("Your 5 minute session has expired. Please, login back to continue")
+                break
+            try:
+                print(welcome_msg)
+                for key,val in opt.items():
+                    if key == ".":
+                        print(f"\n{val} {key}\n")
+                    else:
+                        print(f"{key}. {val}")
+                choice = input("Please choose: ")
+                match choice:
+                    case "1":
+                        clear()
+                        create_login(user_id, encr_key)
+                    case "2":
+                        clear()
+                        find_login(encr_key)
+                    case ".":
+                        clear()
+                        break
+                    case _:
+                        clear()
+                        input("You have to choose smth... ")
+            except (KeyboardInterrupt, EOFError):
+                clear()
+                print("Leaving the program")
+                sys.exit(0)
 
 
 if __name__ == "__main__":
