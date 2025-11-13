@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 # General understanding of the difference between hashing and encryption https://pagorun.medium.com/password-encryption-in-python-securing-your-data-9e0045e039e1
 
 ### Global variables
-welcome_msg = "Welcome to the My$PM\n"
+welcome_msg = "Welcome to the My$PM!\n\nTHE APPLICATION SESSION STARTED, IT WILL END IN 15 MINUTES!"
 guide = """To create an entry, you need to fill in:\n\n1. Entity Name - should be short and unique name which can be used to select between two accounts on the same site.\n2. Site - can be the short domain name of the site to which the account is related to, for example, \"facebook.com\".\n3. Username - can be whatever you use for login, it can be email address, your username, or actual name.\n4. Password length - how long the password you want to have.\n\nFor security purposes, I believe it would be better that you would not be able to use your own password,\ninstead the password should be generated.\nIn My$PM you can generate passwords with length 10-22 characters.\n\nIF POSSIBLE TRY TO GENERATE AS LONG OF A PASSWORD AS POSSIBLE!!!"""
 find_opt = {
     "1": "Show entry",
@@ -491,8 +491,16 @@ def master_auth():
             input("Password is incorrect. Please try again... ")
 
 
-def session_limit(timeout):
-    
+def session_limit(timeout, stop_timer):
+    start_time = time.time()
+    end = timeout - 5
+    while not stop_timer.is_set():
+        if time.time() - start_time > timeout:
+            clear()
+            print("Session timeout!")
+            os._exit(0)
+        time.sleep(1)
+
 
 def main():
     while True:
@@ -508,16 +516,14 @@ def main():
             clear()
             sys.exit(0)
 
-        SESSION_TIMEOUT = 10
-        START_TIME = time.time()
+        SESSION_TIMEOUT = 20
+        stop_timer = threading.Event()
+        timer_thread = threading.Thread(target=session_limit, daemon=True, args=(SESSION_TIMEOUT, stop_timer))
+        timer_thread.start()
 
-        while True:
-            clear()
-            if time.time() - START_TIME > SESSION_TIMEOUT:
+        try:
+            while True:
                 clear()
-                input("Your 5 minute session has expired. Please, login back to continue")
-                break
-            try:
                 print(welcome_msg)
                 for key,val in opt.items():
                     if key == ".":
@@ -538,10 +544,13 @@ def main():
                     case _:
                         clear()
                         input("You have to choose smth... ")
-            except (KeyboardInterrupt, EOFError):
-                clear()
-                print("Leaving the program")
-                sys.exit(0)
+        except (KeyboardInterrupt, EOFError):
+            clear()
+            break
+            sys.exit(0)
+        finally:
+            stop_timer.set()
+            timer_thread.join(timeout=1)
 
 
 if __name__ == "__main__":
