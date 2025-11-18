@@ -64,6 +64,7 @@ salt_len = 16          # Length of the salt in bytes
 class DB:
     def __init__(self):
         self.db = 'Vault.db'
+        self.permission = 0o600
         with sqlite3.connect(self.db) as conn:
             c = conn.cursor()
 
@@ -91,6 +92,7 @@ class DB:
             ''')
 
             conn.commit()
+        os.chmod(self.db, self.permission)
 
     def run_query(self, query, params=()):
         with sqlite3.connect(self.db) as conn:
@@ -493,7 +495,6 @@ def master_auth():
 
 def session_limit(timeout, stop_timer):
     start_time = time.time()
-    end = timeout - 5
     while not stop_timer.is_set():
         if time.time() - start_time > timeout:
             clear()
@@ -501,6 +502,15 @@ def session_limit(timeout, stop_timer):
             os._exit(0)
         time.sleep(1)
 
+def db_watchdog(db_path, stop_event):
+    while not stop_event.is_set():
+        if not os.path.exists(db_path):
+            clear()
+            print("CRITICAL ERROR: Vault file missing!\n"
+                  "The password database cannot be found.\n"
+                  "Exiting immediately for security.")
+            os._exit(1)   # force-quit for security
+        time.sleep(1)  # small interval, low CPU
 
 def main():
     while True:
@@ -517,9 +527,19 @@ def main():
             sys.exit(0)
 
         SESSION_TIMEOUT = 20
-        stop_timer = threading.Event()
-        timer_thread = threading.Thread(target=session_limit, daemon=True, args=(SESSION_TIMEOUT, stop_timer))
+        stop_event = threading.Event()
+        timer_thread = threading.Thread(
+                target=session_limit,
+                daemon=True,
+                args=(SESSION_TIMEOUT, stop_event)
+        )
         timer_thread.start()
+        watchdog_thread = threading.Thread(
+                target=db_watchdog,
+                daemon=True,
+                args=(db.db, stop_event)
+        )
+        watchdog_thread.start()
 
         try:
             while True:
@@ -547,10 +567,10 @@ def main():
         except (KeyboardInterrupt, EOFError):
             clear()
             break
-            sys.exit(0)
         finally:
-            stop_timer.set()
+            stop_event.set()
             timer_thread.join(timeout=1)
+            watchdog_thread.join(timeout=1)
 
 
 if __name__ == "__main__":
