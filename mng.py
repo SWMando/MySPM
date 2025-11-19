@@ -2,7 +2,7 @@ import os
 import sys
 import re
 import string
-import secrets
+import secrets # https://www.geeksforgeeks.org/python/secrets-python-module-generate-secure-random-numbers/
 import time
 import threading
 import base64
@@ -18,6 +18,8 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
 # General understanding of the difference between hashing and encryption https://pagorun.medium.com/password-encryption-in-python-securing-your-data-9e0045e039e1
+
+# Input validation, try-except: https://www.geeksforgeeks.org/python/input-validation-in-python/
 
 ### Global variables
 welcome_msg = "Welcome to the My$PM!\n\nTHE APPLICATION SESSION STARTED, IT WILL END IN 15 MINUTES!"
@@ -46,12 +48,14 @@ MAX_ENTITY_NAME = 64
 MAX_SITE_NAME = 253
 MAX_MASTER_PASSWORD= 64
 
-ENTITY_RE = re.compile(r"^[A-Za-z0-9_\-\. ]{1,%d}$" % MAX_ENTITY_NAME)   # letters, digits, _, -, ., space
-SITE_RE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")  # basic domain check
-USERNAME_RE = re.compile(r"^[A-Za-z0-9_.@+\-]{1,%d}$" % MAX_USERNAME)  # allow email like chars
+ENTITY_RE = re.compile(fr"^[A-Za-z0-9_.\- ]{{1,{MAX_ENTITY_NAME}}}$")
+SITE_RE = re.compile(fr"^(?=.{1,{MAX_SITE_NAME}}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{{0,61}}[A-Za-z0-9])?\.)+[A-Za-z]{{2,63}}$")
+USERNAME_RE = re.compile(fr"^[A-Za-z0-9_.@+\-]{{1,{MAX_USERNAME}}}$")
+MASTER_PASSWORD_RE = re.compile(fr"^[A-Za-z0-9!@#$%\^&*\-_=+\.,<>?]{{1,{MAX_MASTER_PASSWORD}}}$")
 
-# Time limit for the app
-
+#ENTITY_RE = re.compile(r"^[A-Za-z0-9_\-\. ]{1,%d}$" % MAX_ENTITY_NAME)   # letters, digits, _, -, ., space
+#SITE_RE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")  # basic domain check
+#USERNAME_RE = re.compile(r"^[A-Za-z0-9_.@+\-]{1,%d}$" % MAX_USERNAME)  # allow email like chars
 
 # For Argon2ID
 time_cost = 2          # Number of iterations
@@ -63,36 +67,37 @@ salt_len = 16          # Length of the salt in bytes
 # class
 class DB:
     def __init__(self):
-        self.db = 'Vault.db'
+        self.db = 'Vault/Vault.db'
         self.permission = 0o600
-        with sqlite3.connect(self.db) as conn:
-            c = conn.cursor()
+        if not os.path.exists(self.db):
+            with sqlite3.connect(self.db) as conn:
+                c = conn.cursor()
 
-            # Secure users table
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,         -- store hashed password, never plaintext
-                    salt BLOB NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS logins (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    entity_name TEXT UNIQUE NOT NULL,
-                    site_name TEXT NOT NULL,
-                    username TEXT NOT NULL,
-                    password_encr BLOB NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                )
-            ''')
+                # Secure users table
+                c.execute('''
+                    CREATE TABLE IF NOT EXISTS users (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT UNIQUE NOT NULL,
+                        password_hash TEXT NOT NULL,         -- store hashed password, never plaintext
+                        salt BLOB NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                c.execute('''
+                    CREATE TABLE IF NOT EXISTS logins (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        entity_name TEXT UNIQUE NOT NULL,
+                        site_name TEXT NOT NULL,
+                        username TEXT NOT NULL,
+                        password_encr BLOB NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    )
+                ''')
 
-            conn.commit()
-        os.chmod(self.db, self.permission)
+                conn.commit()
+            os.chmod(self.db, self.permission)
 
     def run_query(self, query, params=()):
         with sqlite3.connect(self.db) as conn:
@@ -106,15 +111,31 @@ class DB:
             c.execute(query, params)
             conn.commit()
 
-#    def reset_seq(self):
-#        with sqlite3.connect(self.db) as conn:
-#            c = conn.cursor()
-#            c.execute('''SELECT name FROM sqlite_master WHERE type=\'table\' AND name=\'sqlite_sequence\'''')
-#            if c.fetchone():
-#                c.execute('''DELETE FROM sqlite_sequence WHERE name = ?''', ("logins",))
-#            conn.commit()
 
-#logging.basicConfig(format="{levelname}")
+# Essential Directories
+mode = 0o700
+logDir = 'myspm_logs'
+vaultDir = 'Vault'
+if not os.path.exists(logDir):
+    os.mkdir(logDir, mode)
+
+if not os.path.exists(vaultDir):
+    os.mkdir(vaultDir, mode)
+
+# Logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+log_format = logging.Formatter(
+    "{asctime} {levelname} {message}",
+    datefmt='%b %d %H:%M:%S',
+    style='{'
+)
+file_handler = logging.FileHandler('myspm_logs/mng.log')
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(log_format)
+
+logger.addHandler(file_handler)
+
 db = DB()
 
 # code snipplet taken from https://hackernoon.com/argon2-in-practice-how-to-implement-secure-password-hashing-in-your-application
@@ -186,8 +207,6 @@ def clear():
         os.system("clear")
 
 
-#def session_limit():
-
 def entity_name_sanitize(userinput: str):
     if userinput == "":
         raise EmptyInput()
@@ -223,10 +242,10 @@ def username_sanitize(userinput: str):
 def password_sanitize(userinput: str):
     if userinput == "":
         raise EmptyInput()
-    if len(username) > MAX_MASTER_PASSWORD:
+    if len(userinput) > MAX_MASTER_PASSWORD:
         raise LongMasterPassword()
-    #if re.search(ENTITY_RE, userinput) is None:
-    #    raise re.error("Invalid Entity Name: contains disallowed characters!")
+    if re.search(MASTER_PASSWORD_RE, userinput) is None:
+        raise re.error("Invalid Entity Name: contains disallowed characters!")
 
     return userinput
 
@@ -240,16 +259,43 @@ def check_master_user():
 
 
 def create_master_user():
-    try:
-        username = input("Please enter your username: ")
-        password = input("Please enter your password: ")
-        password_hash = hash_password(password.strip())
-        salt = os.urandom(16)
-        db.run_change('''INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?) ''', params=(username.strip(), password_hash, salt))
-    except (KeyboardInterrupt, EOFError):
-        clear()
-        print("Leaving the program")
-        sys.exit(0)
+    while True:
+        try:
+            username = input("Please enter your username: ").strip()
+            password = input("Please enter your password: ").strip()
+            master_user_sanititzed = username_sanitize(username)
+            master_password_sanitized = password_sanitize(password)
+            break
+        except (KeyboardInterrupt, EOFError):
+            clear()
+            print("Leaving the program")
+            sys.exit(0)
+        except sqlite3.OperationalError:
+            clear()
+            logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
+            print("Please check the if the Vault was altered! It seems that it was removed")
+            os._exit(1)
+        except MemoryError:
+            clear()
+            logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
+            input(f"Memory Overload Error! Please press enter to continue... ")
+            os._exit(1)
+        except (EmptyInput) as e:
+            clear()
+            input(f"{e}. Please press enter to continue... ")
+        except (LongUsername) as e:
+            clear()
+            input(f"{e}. Please press enter to continue... ")
+        except (LongMasterPassword) as e:
+            clear()
+            input(f"{e}. Please press enter to continue... ")
+        except re.PatternError as e:
+            clear()
+            input(f"{e}. Please press enter to continue... ")
+
+    password_hash = hash_password(master_password_sanitized)
+    salt = os.urandom(16)
+    db.run_change('''INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?) ''', params=(master_user_sanititzed, password_hash, salt))
 
 
 def derive_key(username, password):
@@ -320,6 +366,7 @@ def create_login(user_id, key):
             input("Entered Entity Name is already used. Please try to use something different! ")
         except sqlite3.OperationalError:
             clear()
+            logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
             print("Please check the if the Vault was altered! It seems that it was removed")
             sys.exit(0)
         except KeyboardInterrupt:
@@ -331,7 +378,9 @@ def create_login(user_id, key):
             input("Please press enter to continue... ")
         except MemoryError:
             clear()
+            logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
+            os._exit(1)
         except (EmptyInput) as e:
             clear()
             input(f"{e}. Please press enter to continue... ")
@@ -374,9 +423,14 @@ def delete_login(entity_name):
         return
     except sqlite3.OperationalError:
         clear()
+        logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
         print("Please check the if the Vault was altered! It seems that it was removed")
         sys.exit(1)
-
+    except MemoryError:
+        clear()
+        logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
+        input(f"Memory Overload Error! Please press enter to continue... ")
+        os._exit(1)
 
 
 def edit_login(key, entity_name):
@@ -405,8 +459,14 @@ def edit_login(key, entity_name):
             db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
     except sqlite3.OperationalError:
         clear()
+        logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
         print("Please check the if the Vault was altered! It seems that it was removed")
         sys.exit(1)
+    except MemoryError:
+        clear()
+        logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
+        input(f"Memory Overload Error! Please press enter to continue... ")
+        os._exit(1)
 
 
 def find_login(key):
@@ -469,8 +529,14 @@ def find_login(key):
         except ValueError:
             clear()
             input("Please enter an integer to choose the length for the password... ")
+        except MemoryError:
+            clear()
+            logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
+            input(f"Memory Overload Error! Please press enter to continue... ")
+            os._exit(1)
         except sqlite3.OperationalError:
             clear()
+            logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
             print("Please check the if the Vault was altered! It seems that it was removed")
             sys.exit(1)
 
@@ -489,15 +555,22 @@ def master_auth():
             break
         except IndexError:
             input("Username does not exist. Please try again... ")
+        except MemoryError:
+            clear()
+            logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
+            input(f"Memory Overload Error! Please press enter to continue... ")
+            os._exit(1)
         except argon2.exceptions.VerifyMismatchError:
             input("Password is incorrect. Please try again... ")
-
+    
+    logger.info("Master User Successful Login!")
 
 def session_limit(timeout, stop_timer):
     start_time = time.time()
     while not stop_timer.is_set():
         if time.time() - start_time > timeout:
             clear()
+            logger.info("Session expired due to timeout. Exiting My$PM")
             print("Session timeout!")
             os._exit(0)
         time.sleep(1)
@@ -506,6 +579,7 @@ def db_watchdog(db_path, stop_event):
     while not stop_event.is_set():
         if not os.path.exists(db_path):
             clear()
+            logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
             print("CRITICAL ERROR: Vault file missing!\n"
                   "The password database cannot be found.\n"
                   "Exiting immediately for security.")
@@ -567,6 +641,11 @@ def main():
         except (KeyboardInterrupt, EOFError):
             clear()
             break
+        except MemoryError:
+            clear()
+            logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
+            input(f"Memory Overload Error! Please press enter to continue... ")
+            os._exit(1)
         finally:
             stop_event.set()
             timer_thread.join(timeout=1)
