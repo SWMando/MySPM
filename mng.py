@@ -46,11 +46,11 @@ opt = {
 MAX_USERNAME = 64
 MAX_ENTITY_NAME = 64
 MAX_SITE_NAME = 253
-MAX_MASTER_PASSWORD= 64
+MAX_MASTER_PASSWORD = 64
 
-ENTITY_RE = re.compile(fr"^[A-Za-z0-9_.\- ]{{1,{MAX_ENTITY_NAME}}}$")
-SITE_RE = re.compile(fr"^(?=.{1,{MAX_SITE_NAME}}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{{0,61}}[A-Za-z0-9])?\.)+[A-Za-z]{{2,63}}$")
-USERNAME_RE = re.compile(fr"^[A-Za-z0-9_.@+\-]{{1,{MAX_USERNAME}}}$")
+ENTITY_RE = re.compile(rf"^[A-Za-z0-9_.\- ]{{1,{MAX_ENTITY_NAME}}}$")
+SITE_RE = re.compile(rf"^[A-Za-z0-9._:/@+\- ]{{1,{MAX_SITE_NAME}}}$")
+USERNAME_RE = re.compile(rf"^[A-Za-z0-9_.@+\-]{{1,{MAX_USERNAME}}}$")
 MASTER_PASSWORD_RE = re.compile(fr"^[A-Za-z0-9!@#$%\^&*\-_=+\.,<>?]{{1,{MAX_MASTER_PASSWORD}}}$")
 
 #ENTITY_RE = re.compile(r"^[A-Za-z0-9_\-\. ]{1,%d}$" % MAX_ENTITY_NAME)   # letters, digits, _, -, ., space
@@ -197,6 +197,37 @@ class LongMasterPassword(Exception):
     def __str__(self):
         return f"{self.message}"
 
+class InvalidEntityInput(Exception):
+    def __init__(self):
+        self.message = "Invalid Entity Name: contains disallowed characters!"
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.message}"
+
+class InvalidSiteInput(Exception):
+    def __init__(self):
+        self.message = "Invalid Site Name: contains disallowed characters!"
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.message}"
+
+class InvalidUsernameInput(Exception):
+    def __init__(self):
+        self.message = "Invalid Username: contains disallowed characters!"
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.message}"
+
+class InvalidMasterPassInput(Exception):
+    def __init__(self):
+        self.message = "Invalid Master Password: contains disallowed characters!"
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.message}"
 #---------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------
@@ -212,8 +243,9 @@ def entity_name_sanitize(userinput: str):
         raise EmptyInput()
     if len(userinput) > MAX_ENTITY_NAME:
         raise LongEntityName()
-    if re.search(ENTITY_RE, userinput) is None:
-        raise re.error("Invalid Entity Name: contains disallowed characters!")
+    if ENTITY_RE.fullmatch(userinput) is None:
+        raise InvalidEntityInput()
+
     return userinput
 
 
@@ -222,8 +254,8 @@ def site_sanitize(userinput: str):
         raise EmptyInput()
     if len(userinput) > MAX_SITE_NAME:
         raise LongSiteName()
-    if re.search(SITE_RE, userinput) is None:
-        raise re.error("Invalid Entity Name: contains disallowed characters!")
+    if SITE_RE.fullmatch(userinput) is None:
+        raise InvalidSiteInput()
 
     return userinput
 
@@ -233,8 +265,8 @@ def username_sanitize(userinput: str):
         raise EmptyInput()
     if len(userinput) > MAX_USERNAME:
         raise LongUserName()
-    if re.search(USERNAME_RE, userinput) is None:
-        raise re.error("Invalid Entity Name: contains disallowed characters!")
+    if USERNAME_RE.fullmatch(userinput) is None:
+        raise InvalidUsernameInput()
 
     return userinput
 
@@ -244,8 +276,8 @@ def password_sanitize(userinput: str):
         raise EmptyInput()
     if len(userinput) > MAX_MASTER_PASSWORD:
         raise LongMasterPassword()
-    if re.search(MASTER_PASSWORD_RE, userinput) is None:
-        raise re.error("Invalid Entity Name: contains disallowed characters!")
+    if MASTER_PASSWORD_RE.fullmatch(userinput) is None:
+        raise InvalidMasterPassInput()
 
     return userinput
 
@@ -263,11 +295,14 @@ def create_master_user():
         try:
             username = input("Please enter your username: ").strip()
             password = input("Please enter your password: ").strip()
+            logger.info("Sanitizing Username")
             master_user_sanititzed = username_sanitize(username)
+            logger.info("Sanitizing Password")
             master_password_sanitized = password_sanitize(password)
             break
         except (KeyboardInterrupt, EOFError):
             clear()
+            logger.debug("User left the program while creating Master User account")
             print("Leaving the program")
             sys.exit(0)
         except sqlite3.OperationalError:
@@ -280,22 +315,17 @@ def create_master_user():
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
             os._exit(1)
-        except (EmptyInput) as e:
+        except (EmptyInput, LongUsername, LongMasterPassword, InvalidUsernameInput, InvalidMasterPassInput) as e:
             clear()
-            input(f"{e}. Please press enter to continue... ")
-        except (LongUsername) as e:
-            clear()
-            input(f"{e}. Please press enter to continue... ")
-        except (LongMasterPassword) as e:
-            clear()
-            input(f"{e}. Please press enter to continue... ")
-        except re.PatternError as e:
-            clear()
+            logger.error(e)
             input(f"{e}. Please press enter to continue... ")
 
+    logger.info("Hashing the password")
     password_hash = hash_password(master_password_sanitized)
     salt = os.urandom(16)
+    logger.info("Uploading newly created Master User to the Database")
     db.run_change('''INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?) ''', params=(master_user_sanititzed, password_hash, salt))
+    logger.info("Master User created successfully!")
 
 
 def derive_key(username, password):
@@ -353,48 +383,44 @@ def create_login(user_id, key):
             # https://stackoverflow.com/questions/27335726/how-do-i-encrypt-and-decrypt-a-string-in-python
             f = Fernet(base64.urlsafe_b64encode(key))
             password_encr = f.encrypt(password.encode())
+            logger.info("Sanitizing the entity name")
             entity_name_sanitized = entity_name_sanitize(entity_name)
+            logger.info("Sanitizing the site name")
             site_sanitized = site_sanitize(site)
+            logger.info("Sanitizing the username")
             username_sanitized = username_sanitize(username)
+            logger.info("Uploading the new login to the Database")
             db.run_change('''INSERT INTO logins (user_id, entity_name, site_name, username, password_encr) VALUES (?, ?, ?, ?, ?)''', params=(user_id, entity_name_sanitized, site_sanitized, username_sanitized, password_encr))
             break
         except ValueError:
             clear()
+            logger.error("User tried passing non integer type to password length input")
             input("Please enter an integer to choose the length for the password... ")
         except sqlite3.IntegrityError:
             clear()
+            logger.error("User tried using entity name which already exists")
             input("Entered Entity Name is already used. Please try to use something different! ")
         except sqlite3.OperationalError:
             clear()
             logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
             print("Please check the if the Vault was altered! It seems that it was removed")
             sys.exit(0)
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError):
             clear()
+            logger.debug("Leaving create_login function")
             break
-        except EOFError:
-            clear()
-            break
-            input("Please press enter to continue... ")
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
             os._exit(1)
-        except (EmptyInput) as e:
+        except (EmptyInput, LongEntityName, LongSiteName, LongUsername) as e:
             clear()
+            logger.error(e)
             input(f"{e}. Please press enter to continue... ")
-        except (LongEntityName) as e:
+        except (InvalidEntityInput, InvalidSiteInput, InvalidUsernameInput) as e:
             clear()
-            input(f"{e}. Please press enter to continue... ")
-        except (LongSiteName) as e:
-            clear()
-            input(f"{e}. Please press enter to continue... ")
-        except (LongUsername) as e:
-            clear()
-            input(f"{e}. Please press enter to continue... ")
-        except re.PatternError as e:
-            clear()
+            logger.error(e)
             input(f"{e}. Please press enter to continue... ")
 
 
@@ -403,10 +429,13 @@ def copy_login(key, password_encr):
     f = Fernet(base64.urlsafe_b64encode(key))
     try:
         pyperclip.copy(f.decrypt(password_encr).decode("utf-8"))
+        logger.info("Password copied to clipboard, starting 8 second counter")
         print("Password copied!")
         time.sleep(8)
         pyperclip.copy('')
+        logger.info("Clipboard cleared. End of 8 second counter")
     except (KeyboardInterrupt, EOFError):
+        logger.warning("User stopped the process, clearing the keyboard")
         pyperclip.copy('')
         input("Please press enter to continue... ")
 
@@ -414,10 +443,13 @@ def copy_login(key, password_encr):
 def delete_login(entity_name):
     clear()
     try:
+        logger.info("Asking whether user is sure with the deletion")
         ays = input("Are you sure that you want to delete this? Ones deleted, you will not be able to recover this(y/n): ")
         if ays.lower() == "y":
+            logger.info("Asking user to enter DELETE to confirm")
             enterDELETE = input("Please enter \"DELETE\": ")
             if enterDELETE == "DELETE":
+                logger.info("Deleting login from the Database")
                 db.run_change('''DELETE FROM logins WHERE entity_name = ?''', params=(entity_name,))
             return
         return
@@ -434,39 +466,61 @@ def delete_login(entity_name):
 
 
 def edit_login(key, entity_name):
-    try:
+    while True:
         clear()
-        print(edit_msg)
-        new_entity_name = input("Entity Name: ").strip()
-        new_site = input("Site: ").strip()
-        new_username = input("Username: ").strip()
-        new_password_len = input("Password Length: ").strip()
+        try:
+            print(edit_msg)
+            new_entity_name = input("Entity Name: ").strip()
+            new_site = input("Site: ").strip()
+            new_username = input("Username: ").strip()
+            new_password_len = input("Password Length: ").strip()
 
-        ays = input("Are you sure that you want to apply these changes? Ones applied, you will not be able to revert this(y/n): ")
-        if ays == "n":
-            return
+            ays = input("Are you sure that you want to apply these changes? Ones applied, you will not be able to revert this(y/n): ")
+            if ays == "n":
+                return
 
-        if new_entity_name != "":
-            db.run_change('''UPDATE logins SET entity_name = ? WHERE entity_name = ?''', params=(new_entity_name, entity_name))
-        if new_site != "":
-            db.run_change('''UPDATE logins SET site_name = ? WHERE entity_name = ?''', params=(new_site, entity_name))
-        if new_username != "":
-            db.run_change('''UPDATE logins SET username = ? WHERE entity_name = ?''', params=(new_username, entity_name))
-        if new_password_len != "":
-            password = password_gen(int(new_password_len))
-            f = Fernet(base64.urlsafe_b64encode(key))
-            password_encr = f.encrypt(password.encode())
-            db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
-    except sqlite3.OperationalError:
-        clear()
-        logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
-        print("Please check the if the Vault was altered! It seems that it was removed")
-        sys.exit(1)
-    except MemoryError:
-        clear()
-        logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
-        input(f"Memory Overload Error! Please press enter to continue... ")
-        os._exit(1)
+
+            if new_entity_name != "":
+                logger.info("Sanitizing the new entity name")
+                new_entity_sanitized = entity_name_sanitize(new_entity_name)
+                logger.info("Applying entity name change")
+                db.run_change('''UPDATE logins SET entity_name = ? WHERE entity_name = ?''', params=(new_entity_sanitized, entity_name))
+            if new_site != "":
+                logger.info("Sanitizing the new site name")
+                new_site_name = site_name_sanitize(new_site)
+                logger.info("Applying site name change")
+                db.run_change('''UPDATE logins SET site_name = ? WHERE entity_name = ?''', params=(new_site_sanitized, entity_name))
+            if new_username != "":
+                logger.info("Sanitizing the new username")
+                new_username_sanitized = username_sanitize(new_username)
+                logger.info("Applying username change")
+                db.run_change('''UPDATE logins SET username = ? WHERE entity_name = ?''', params=(new_username_sanitized, entity_name))
+            if new_password_len != "":
+                if int(new_password_len) < 10 or int(new_password_len) > 22:
+                    length = 10
+                password = password_gen(int(new_password_len))
+                f = Fernet(base64.urlsafe_b64encode(key))
+                password_encr = f.encrypt(password.encode())
+                logger.info("Applying password change")
+                db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
+        except sqlite3.OperationalError:
+            clear()
+            logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
+            print("Please check the if the Vault was altered! It seems that it was removed")
+            sys.exit(1)
+        except MemoryError:
+            clear()
+            logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
+            input(f"Memory Overload Error! Please press enter to continue... ")
+            os._exit(1)
+        except (EmptyInput, LongEntityName, LongSiteName, LongUsername) as e:
+            clear()
+            logger.error(e)
+            input(f"{e}. Please press enter to continue... ")
+        except (InvalidEntityInput, InvalidSiteInput, InvalidUsernameInput) as e:
+            clear()
+            logger.error(e)
+            input(f"{e}. Please press enter to continue... ")
 
 
 def find_login(key):
@@ -489,6 +543,7 @@ def find_login(key):
                     clear()
                     query = db.run_query('''SELECT site_name, username, password_encr FROM logins WHERE entity_name = ?''', params=(entity_name,))
                     site, username, password_encr = query[0]
+                    logger.debug("User opened a login entry")
                     while True:
                         clear()
                         print(f"Site: {site}\nUsername: {username}\n")
@@ -517,6 +572,7 @@ def find_login(key):
                 case "2":
                     continue
                 case ".":
+                    logger.debug("User left find_login function")
                     break
                 case _:
                     clear()
@@ -524,7 +580,8 @@ def find_login(key):
         except IndexError:
             clear()
             input("It seems entered label does not exist... ")
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError):
+            logger.debug("User left find_login function")
             break
         except ValueError:
             clear()
@@ -600,7 +657,7 @@ def main():
             clear()
             sys.exit(0)
 
-        SESSION_TIMEOUT = 20
+        SESSION_TIMEOUT = 900
         stop_event = threading.Event()
         timer_thread = threading.Thread(
                 target=session_limit,
