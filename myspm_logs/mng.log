@@ -1,0 +1,34 @@
+2025-11-22 15:14:16 INFO Starting My$PM
+2025-11-22 15:14:16 INFO Starting Database watchdog
+2025-11-22 15:14:16 DEBUG Checking if Master User exists
+2025-11-22 15:14:16 INFO Starting Master User Authentication
+2025-11-22 15:14:16 DEBUG Prompting for Master Username
+2025-11-22 15:14:19 DEBUG Prompting for Master Password
+2025-11-22 15:14:20 INFO Checking Master Login Credentials
+2025-11-22 15:14:20 INFO Entered Master Username does not exist
+2025-11-22 15:14:20 DEBUG Prompting for Master Username
+2025-11-22 15:14:21 DEBUG Prompting for Master Password
+2025-11-22 15:14:22 INFO Checking Master Login Credentials
+2025-11-22 15:14:22 DEBUG Session 900 seconds started
+2025-11-22 15:14:23 DEBUG User wants to create a login entry
+2025-11-22 15:14:24 DEBUG Prompting user for entity name
+2025-11-22 15:14:25 DEBUG Leaving create_login function
+2025-11-22 15:14:26 DEBUG User wants to find a login entry
+2025-11-22 15:14:26 DEBUG Prompting for site name user is looking for
+2025-11-22 15:14:29 DEBUG User left find_login function
+2025-11-22 15:14:29 DEBUG Logging out
+2025-11-22 15:14:29 DEBUG Session Stopped
+2025-11-22 15:14:30 DEBUG Database Watchdog stopped
+2025-11-22 15:14:30 INFO Starting Database watchdog
+2025-11-22 15:14:30 DEBUG Checking if Master User exists
+2025-11-22 15:14:30 INFO Starting Master User Authentication
+2025-11-22 15:14:30 DEBUG Prompting for Master Username
+2025-11-22 15:14:31 DEBUG Prompting for Master Password
+2025-11-22 15:14:33 INFO Checking Master Login Credentials
+2025-11-22 15:14:33 INFO Entered Master Password is incorrect
+2025-11-22 15:14:33 DEBUG Prompting for Master Username
+2025-11-22 15:14:34 DEBUG Prompting for Master Password
+2025-11-22 15:14:35 INFO Checking Master Login Credentials
+2025-11-22 15:14:35 DEBUG Session 900 seconds started
+2025-11-22 15:14:36 DEBUG Session Stopped
+2025-11-22 15:14:37 DEBUG Database Watchdog stopped

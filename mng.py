@@ -9,6 +9,7 @@ import base64
 import getpass # https://www.geeksforgeeks.org/python/getpass-and-getuser-in-python-password-without-echo/
 import platform
 import pyperclip
+from logging.handlers import RotatingFileHandler
 import logging
 import sqlite3 # https://www.geeksforgeeks.org/python/python-sqlite-cursor-object/
 from tabulate import tabulate
@@ -126,11 +127,18 @@ if not os.path.exists(vaultDir):
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 log_format = logging.Formatter(
-    "{asctime} {levelname} {message}",
-    datefmt='%b %d %H:%M:%S',
+    '{asctime} {levelname} {message}',
+    datefmt='%Y-%m-%d %H:%M:%S',
     style='{'
 )
-file_handler = logging.FileHandler('myspm_logs/mng.log')
+
+# ROTATION HANDLER (SIZE-BASED)
+file_handler = RotatingFileHandler(
+    "myspm_logs/mng.log",
+    maxBytes=100_000_000,     # 100MB per file
+    backupCount=10,         # keep 10 old log files
+)
+
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(log_format)
 
@@ -370,9 +378,13 @@ def create_login(user_id, key):
         clear()
         try:
             print(f"{guide}\n")
+            logger.debug("Prompting user for entity name")
             entity_name = input("Please give a short and unique name for the entry: ").strip()
+            logger.debug("Prompting user for site name")
             site = input("Please enter the site: ").strip()
+            logger.debug("Prompting user for username")
             username = input("Please enter the username: ").strip()
+            logger.debug("Prompting user for password length")
             length = input("Please enter password length(10-22): ").strip()
             if length == "":
                 length = 10
@@ -435,7 +447,7 @@ def copy_login(key, password_encr):
         pyperclip.copy('')
         logger.info("Clipboard cleared. End of 8 second counter")
     except (KeyboardInterrupt, EOFError):
-        logger.warning("User stopped the process, clearing the keyboard")
+        logger.info("User stopped the process, clearing the keyboard")
         pyperclip.copy('')
         input("Please press enter to continue... ")
 
@@ -470,11 +482,15 @@ def edit_login(key, entity_name):
         clear()
         try:
             print(edit_msg)
+            logger.debug("Prompting user for new entity name")
             new_entity_name = input("Entity Name: ").strip()
+            logger.debug("Prompting user for new site name")
             new_site = input("Site: ").strip()
+            logger.debug("Prompting user for new username")
             new_username = input("Username: ").strip()
+            logger.debug("Prompting user for new password length")
             new_password_len = input("Password Length: ").strip()
-
+            logger.debug("Asking if user is sure to apply changes")
             ays = input("Are you sure that you want to apply these changes? Ones applied, you will not be able to revert this(y/n): ")
             if ays == "n":
                 return
@@ -503,6 +519,7 @@ def edit_login(key, entity_name):
                 password_encr = f.encrypt(password.encode())
                 logger.info("Applying password change")
                 db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
+                break
         except sqlite3.OperationalError:
             clear()
             logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
@@ -527,6 +544,7 @@ def find_login(key):
     while True:
         clear()
         try:
+            logger.debug("Prompting for site name user is looking for")
             site = input("Please enter the site name you are looking for: ")
             query = db.run_query('''SELECT entity_name, site_name, username FROM logins WHERE site_name LIKE ?''', params=(f"%{site}%",))
             headers = ["Entity Name", "Site", "Username"]
@@ -539,7 +557,7 @@ def find_login(key):
             find_choice = input("Please choose an option: ")
             match find_choice:
                 case "1":
-                    entity_name = input("Please choose an entry(Entity Name): ")
+                    entity_name = input("Please choose an entry (Entity Name): ")
                     clear()
                     query = db.run_query('''SELECT site_name, username, password_encr FROM logins WHERE entity_name = ?''', params=(entity_name,))
                     site, username, password_encr = query[0]
@@ -558,14 +576,18 @@ def find_login(key):
 
                         match find_action_choice:
                             case "1":
+                                logger.debug("User wants to copy the password")
                                 copy_login(key, password_encr)
                             case "2":
+                                logger.debug("User wants to delete the login entry")
                                 delete_login(entity_name)
                                 break
                             case "3":
+                                logger.debug("User wants to edit the login entry")
                                 edit_login(key, entity_name)
                                 break
                             case ".":
+                                logger.debug("User went back to search login entry")
                                 break
                             case _:
                                 input("Please choose an option!!! ")
@@ -579,12 +601,14 @@ def find_login(key):
                     input("Please choose an option!!! ")
         except IndexError:
             clear()
-            input("It seems entered label does not exist... ")
+            logger.debug("Entity name chosen does not exist")
+            input("It seems entered entity name does not exist... ")
         except (KeyboardInterrupt, EOFError):
             logger.debug("User left find_login function")
             break
         except ValueError:
             clear()
+            logger.debug("User entered non integer type in find_login")
             input("Please enter an integer to choose the length for the password... ")
         except MemoryError:
             clear()
@@ -599,11 +623,21 @@ def find_login(key):
 
 
 def master_auth():
+    count = 0
+    match count:
+        case 0: timeout = 0
+        case 1: timeout = 60
+        case 2: timeout = 3600
+        case 3: timeout = 86400
+        case _: timeout = 60
     while True:
         clear()
+        logger.debug("Prompting for Master Username")
         username = input("Username: ")
+        logger.debug("Prompting for Master Password")
         password = getpass.getpass()
         try:
+            logger.info("Checking Master Login Credentials")
             query = db.run_query('''SELECT id, password_hash FROM users WHERE username = ?''', params=(username,))
             user_id, stored_pwd = query[0]
             ph.verify(stored_pwd, password)
@@ -611,15 +645,21 @@ def master_auth():
             return user_id, key
             break
         except IndexError:
-            input("Username does not exist. Please try again... ")
+            logger.info("Entered Master Username does not exist")
+            input("Wrong username or password. Please try again... ")
+            time.sleep(timeout)
+            count += 1
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
             os._exit(1)
         except argon2.exceptions.VerifyMismatchError:
-            input("Password is incorrect. Please try again... ")
-    
+            logger.info("Entered Master Password is incorrect")
+            input("Wrong username or password. Please try again... ")
+            time.sleep(timeout)
+            count += 1
+
     logger.info("Master User Successful Login!")
 
 def session_limit(timeout, stop_timer):
@@ -646,31 +686,37 @@ def db_watchdog(db_path, stop_event):
 def main():
     while True:
         clear()
-        master_exists = check_master_user()
-        if master_exists is False:
-            print("Please create a Master User")
-            create_master_user()
-            clear()
-        try:
-            user_id, encr_key = master_auth()
-        except (KeyboardInterrupt, EOFError):
-            clear()
-            sys.exit(0)
-
-        SESSION_TIMEOUT = 900
         stop_event = threading.Event()
-        timer_thread = threading.Thread(
-                target=session_limit,
-                daemon=True,
-                args=(SESSION_TIMEOUT, stop_event)
-        )
-        timer_thread.start()
         watchdog_thread = threading.Thread(
                 target=db_watchdog,
                 daemon=True,
                 args=(db.db, stop_event)
         )
+        logger.info("Starting Database watchdog")
         watchdog_thread.start()
+        logger.debug("Checking if Master User exists")
+        master_exists = check_master_user()
+        if master_exists is False:
+            print("Please create a Master User")
+            logger.info("Creating Master User")
+            create_master_user()
+            clear()
+        try:
+            logger.info("Starting Master User Authentication")
+            user_id, encr_key = master_auth()
+        except (KeyboardInterrupt, EOFError):
+            clear()
+            logger.debug("Leaving the program")
+            sys.exit(0)
+
+        SESSION_TIMEOUT = 900
+        timer_thread = threading.Thread(
+                target=session_limit,
+                daemon=True,
+                args=(SESSION_TIMEOUT, stop_event)
+        )
+        logger.debug(f"Session {SESSION_TIMEOUT} seconds started")
+        timer_thread.start()
 
         try:
             while True:
@@ -685,12 +731,15 @@ def main():
                 match choice:
                     case "1":
                         clear()
+                        logger.debug("User wants to create a login entry")
                         create_login(user_id, encr_key)
                     case "2":
                         clear()
+                        logger.debug("User wants to find a login entry")
                         find_login(encr_key)
                     case ".":
                         clear()
+                        logger.debug("Logging out")
                         break
                     case _:
                         clear()
@@ -706,8 +755,11 @@ def main():
         finally:
             stop_event.set()
             timer_thread.join(timeout=1)
+            logger.debug("Session Stopped")
             watchdog_thread.join(timeout=1)
+            logger.debug("Database Watchdog stopped")
 
 
 if __name__ == "__main__":
+    logger.info("Starting My$PM")
     main()
