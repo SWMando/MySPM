@@ -19,3 +19,232 @@
 2025-11-23 10:13:19 DEBUG Leaving the program
 2025-11-23 10:13:19 DEBUG Session Stopped
 2025-11-23 10:13:19 DEBUG Database Watchdog stopped
+2025-11-23 10:25:16 INFO Starting My$PM
+2025-11-23 10:25:16 INFO Starting Database watchdog
+2025-11-23 10:25:16 DEBUG Checking if Master User exists
+2025-11-23 10:25:16 INFO Starting Master User Authentication
+2025-11-23 10:25:16 DEBUG Prompting for Master Username
+2025-11-23 10:25:18 DEBUG Prompting for Master Password
+2025-11-23 10:25:18 INFO Checking Master Login Credentials
+2025-11-23 10:25:19 DEBUG Session 900 seconds started
+2025-11-23 10:25:20 DEBUG User wants to create a login entry
+2025-11-23 10:25:20 DEBUG Prompting user for entity name
+2025-11-23 10:25:26 DEBUG Prompting user for site name
+2025-11-23 10:25:27 DEBUG Prompting user for username
+2025-11-23 10:25:28 DEBUG Prompting user for password length
+2025-11-23 10:25:28 INFO Sanitizing the entity name
+2025-11-23 10:25:28 ERROR Error Emptry Input! Please enter something!
+2025-11-23 10:25:33 DEBUG Prompting user for entity name
+2025-11-23 10:25:36 DEBUG Leaving create_login function
+2025-11-23 10:25:38 DEBUG User wants to find a login entry
+2025-11-23 10:25:38 DEBUG Prompting for site name user is looking for
+2025-11-23 10:25:43 DEBUG Entity name chosen does not exist
+2025-11-23 10:25:45 DEBUG Prompting for site name user is looking for
+2025-11-23 10:25:48 DEBUG User left find_login function
+2025-11-23 10:25:52 DEBUG User wants to create a login entry
+2025-11-23 10:25:52 DEBUG Prompting user for entity name
+2025-11-23 10:25:56 DEBUG Prompting user for site name
+2025-11-23 10:25:57 DEBUG Prompting user for username
+2025-11-23 10:25:59 DEBUG Prompting user for password length
+2025-11-23 10:26:00 ERROR User tried passing non integer type to password length input
+2025-11-23 10:26:04 DEBUG Prompting user for entity name
+2025-11-23 10:26:06 DEBUG Leaving create_login function
+2025-11-23 10:26:07 DEBUG User wants to find a login entry
+2025-11-23 10:26:07 DEBUG Prompting for site name user is looking for
+2025-11-23 10:26:16 DEBUG Prompting for site name user is looking for
+2025-11-23 10:26:24 DEBUG User left find_login function
+2025-11-23 10:26:25 DEBUG User wants to create a login entry
+2025-11-23 10:26:25 DEBUG Prompting user for entity name
+2025-11-23 10:26:29 DEBUG Prompting user for site name
+2025-11-23 10:26:35 DEBUG Prompting user for username
+2025-11-23 10:26:37 DEBUG Prompting user for password length
+2025-11-23 10:26:38 INFO Sanitizing the entity name
+2025-11-23 10:26:38 INFO Sanitizing the site name
+2025-11-23 10:26:38 INFO Sanitizing the username
+2025-11-23 10:26:38 INFO Uploading the new login to the Database
+2025-11-23 10:26:41 DEBUG User wants to create a login entry
+2025-11-23 10:26:41 DEBUG Prompting user for entity name
+2025-11-23 10:26:43 DEBUG Prompting user for site name
+2025-11-23 10:26:50 DEBUG Prompting user for username
+2025-11-23 10:26:52 DEBUG Prompting user for password length
+2025-11-23 10:26:53 INFO Sanitizing the entity name
+2025-11-23 10:26:53 INFO Sanitizing the site name
+2025-11-23 10:26:53 INFO Sanitizing the username
+2025-11-23 10:26:53 INFO Uploading the new login to the Database
+2025-11-23 10:26:54 DEBUG User wants to create a login entry
+2025-11-23 10:26:54 DEBUG Prompting user for entity name
+2025-11-23 10:26:57 DEBUG Prompting user for site name
+2025-11-23 10:27:01 DEBUG Prompting user for username
+2025-11-23 10:27:03 DEBUG Prompting user for password length
+2025-11-23 10:27:04 INFO Sanitizing the entity name
+2025-11-23 10:27:04 INFO Sanitizing the site name
+2025-11-23 10:27:04 INFO Sanitizing the username
+2025-11-23 10:27:04 INFO Uploading the new login to the Database
+2025-11-23 10:27:06 DEBUG User wants to create a login entry
+2025-11-23 10:27:06 DEBUG Prompting user for entity name
+2025-11-23 10:27:09 DEBUG Prompting user for site name
+2025-11-23 10:27:17 DEBUG Prompting user for username
+2025-11-23 10:27:22 DEBUG Prompting user for password length
+2025-11-23 10:27:23 INFO Sanitizing the entity name
+2025-11-23 10:27:23 INFO Sanitizing the site name
+2025-11-23 10:27:23 INFO Sanitizing the username
+2025-11-23 10:27:23 INFO Uploading the new login to the Database
+2025-11-23 10:27:31 DEBUG User wants to find a login entry
+2025-11-23 10:27:31 DEBUG Prompting for site name user is looking for
+2025-11-23 10:27:47 DEBUG User opened a login entry
+2025-11-23 10:27:50 DEBUG User wants to copy the password
+2025-11-23 10:27:50 INFO Password copied to clipboard, starting 8 second counter
+2025-11-23 10:27:51 INFO User stopped the process, clearing the keyboard
+2025-11-23 10:27:56 DEBUG User wants to delete the login entry
+2025-11-23 10:27:56 INFO Asking whether user is sure with the deletion
+2025-11-23 10:27:59 DEBUG Prompting for site name user is looking for
+2025-11-23 10:28:05 DEBUG User opened a login entry
+2025-11-23 10:28:06 DEBUG User wants to delete the login entry
+2025-11-23 10:28:06 INFO Asking whether user is sure with the deletion
+2025-11-23 10:28:07 INFO Asking user to enter DELETE to confirm
+2025-11-23 10:28:10 DEBUG Prompting for site name user is looking for
+2025-11-23 10:28:15 DEBUG User opened a login entry
+2025-11-23 10:28:17 DEBUG User wants to delete the login entry
+2025-11-23 10:28:17 INFO Asking whether user is sure with the deletion
+2025-11-23 10:28:17 INFO Asking user to enter DELETE to confirm
+2025-11-23 10:28:20 INFO Deleting login from the Database
+2025-11-23 10:28:20 DEBUG Prompting for site name user is looking for
+2025-11-23 10:28:32 DEBUG User opened a login entry
+2025-11-23 10:28:35 DEBUG User wants to edit the login entry
+2025-11-23 10:28:35 DEBUG Prompting user for new entity name
+2025-11-23 10:28:38 DEBUG Prompting user for new site name
+2025-11-23 10:28:39 DEBUG Prompting user for new username
+2025-11-23 10:28:41 DEBUG Prompting user for new password length
+2025-11-23 10:28:43 DEBUG Asking if user is sure to apply changes
+2025-11-23 10:28:46 DEBUG User entered non integer type in find_login
+2025-11-23 10:28:47 DEBUG Prompting for site name user is looking for
+2025-11-23 10:28:55 DEBUG User opened a login entry
+2025-11-23 10:28:59 DEBUG User wants to edit the login entry
+2025-11-23 10:28:59 DEBUG Prompting user for new entity name
+2025-11-23 10:29:00 DEBUG Prompting user for new site name
+2025-11-23 10:29:00 DEBUG Prompting user for new username
+2025-11-23 10:29:01 DEBUG Prompting user for new password length
+2025-11-23 10:29:02 DEBUG Asking if user is sure to apply changes
+2025-11-23 10:29:04 DEBUG User entered non integer type in find_login
+2025-11-23 10:29:05 DEBUG Prompting for site name user is looking for
+2025-11-23 10:29:07 DEBUG User left find_login function
+2025-11-23 10:29:09 DEBUG Logging out
+2025-11-23 10:29:10 DEBUG Session Stopped
+2025-11-23 10:29:10 DEBUG Checking if Master User exists
+2025-11-23 10:29:10 INFO Starting Master User Authentication
+2025-11-23 10:29:10 DEBUG Prompting for Master Username
+2025-11-23 10:29:10 DEBUG Leaving the program
+2025-11-23 10:29:10 DEBUG Database Watchdog stopped
+2025-11-23 10:31:29 INFO Starting My$PM
+2025-11-23 10:31:29 INFO Starting Database watchdog
+2025-11-23 10:31:29 DEBUG Checking if Master User exists
+2025-11-23 10:31:29 INFO Starting Master User Authentication
+2025-11-23 10:31:29 DEBUG Prompting for Master Username
+2025-11-23 10:31:32 DEBUG Prompting for Master Password
+2025-11-23 10:31:33 INFO Checking Master Login Credentials
+2025-11-23 10:31:33 DEBUG Session 900 seconds started
+2025-11-23 10:31:34 DEBUG User wants to find a login entry
+2025-11-23 10:31:34 DEBUG Prompting for site name user is looking for
+2025-11-23 10:31:40 DEBUG User opened a login entry
+2025-11-23 10:31:42 DEBUG User wants to edit the login entry
+2025-11-23 10:31:42 DEBUG Prompting user for new entity name
+2025-11-23 10:31:43 DEBUG Prompting user for new site name
+2025-11-23 10:31:43 DEBUG Prompting user for new username
+2025-11-23 10:31:44 DEBUG Prompting user for new password length
+2025-11-23 10:31:45 DEBUG Asking if user is sure to apply changes
+2025-11-23 10:31:48 DEBUG User entered non integer type in find_login
+2025-11-23 10:31:49 DEBUG Prompting for site name user is looking for
+2025-11-23 10:31:58 DEBUG User left find_login function
+2025-11-23 10:31:59 DEBUG Leaving the program
+2025-11-23 10:31:59 DEBUG Database Watchdog stopped
+2025-11-23 10:32:00 DEBUG Session Stopped
+2025-11-23 10:36:16 INFO Starting My$PM
+2025-11-23 10:36:16 INFO Starting Database watchdog
+2025-11-23 10:36:16 DEBUG Checking if Master User exists
+2025-11-23 10:36:16 INFO Starting Master User Authentication
+2025-11-23 10:36:16 DEBUG Prompting for Master Username
+2025-11-23 10:36:18 DEBUG Prompting for Master Password
+2025-11-23 10:36:19 INFO Checking Master Login Credentials
+2025-11-23 10:36:19 DEBUG Session 900 seconds started
+2025-11-23 10:36:21 DEBUG User wants to find a login entry
+2025-11-23 10:36:21 DEBUG Prompting for site name user is looking for
+2025-11-23 10:36:26 DEBUG Prompting for site name user is looking for
+2025-11-23 10:36:33 DEBUG Prompting for site name user is looking for
+2025-11-23 10:36:39 DEBUG Prompting for site name user is looking for
+2025-11-23 10:36:44 DEBUG User opened a login entry
+2025-11-23 10:36:46 DEBUG User wants to edit the login entry
+2025-11-23 10:36:46 DEBUG Prompting user for new entity name
+2025-11-23 10:36:46 DEBUG Prompting user for new site name
+2025-11-23 10:36:47 DEBUG Prompting user for new username
+2025-11-23 10:36:47 DEBUG Prompting user for new password length
+2025-11-23 10:36:49 DEBUG Asking if user is sure to apply changes
+2025-11-23 10:36:50 DEBUG User entered non integer type to set password length
+2025-11-23 10:36:55 DEBUG Prompting user for new entity name
+2025-11-23 10:36:58 DEBUG Prompting user for new site name
+2025-11-23 10:36:58 DEBUG Prompting user for new username
+2025-11-23 10:36:58 DEBUG Prompting user for new password length
+2025-11-23 10:37:00 DEBUG Asking if user is sure to apply changes
+2025-11-23 10:37:01 INFO Applying password change
+2025-11-23 10:37:02 DEBUG Prompting for site name user is looking for
+2025-11-23 10:37:06 DEBUG User left find_login function
+2025-11-23 10:37:07 DEBUG Logging out
+2025-11-23 10:37:07 DEBUG Session Stopped
+2025-11-23 10:37:07 DEBUG Checking if Master User exists
+2025-11-23 10:37:07 INFO Starting Master User Authentication
+2025-11-23 10:37:07 DEBUG Prompting for Master Username
+2025-11-23 10:37:08 DEBUG Leaving the program
+2025-11-23 10:37:08 DEBUG Database Watchdog stopped
+2025-11-23 10:38:13 INFO Starting My$PM
+2025-11-23 10:38:13 INFO Starting Database watchdog
+2025-11-23 10:38:13 DEBUG Checking if Master User exists
+2025-11-23 10:38:13 INFO Starting Master User Authentication
+2025-11-23 10:38:13 DEBUG Prompting for Master Username
+2025-11-23 10:38:23 DEBUG Prompting for Master Password
+2025-11-23 10:38:25 INFO Checking Master Login Credentials
+2025-11-23 10:38:25 INFO Entered Master Username does not exist
+2025-11-23 10:38:26 INFO User has 0 number of attempts. Account throttled for 0 seconds
+2025-11-23 10:38:26 DEBUG Prompting for Master Username
+2025-11-23 10:38:31 DEBUG Prompting for Master Password
+2025-11-23 10:38:32 INFO Checking Master Login Credentials
+2025-11-23 10:38:33 DEBUG Session 900 seconds started
+2025-11-23 10:38:34 DEBUG User wants to find a login entry
+2025-11-23 10:38:34 DEBUG Prompting for site name user is looking for
+2025-11-23 10:38:50 DEBUG Prompting for site name user is looking for
+2025-11-23 10:38:56 DEBUG User left find_login function
+2025-11-23 10:38:57 DEBUG User wants to create a login entry
+2025-11-23 10:38:57 DEBUG Prompting user for entity name
+2025-11-23 10:40:03 DEBUG Prompting user for site name
+2025-11-23 10:40:03 DEBUG Prompting user for username
+2025-11-23 10:40:04 DEBUG Prompting user for password length
+2025-11-23 10:40:05 INFO Sanitizing the entity name
+2025-11-23 10:40:05 ERROR Error Emptry Input! Please enter something!
+2025-11-23 10:40:06 DEBUG Prompting user for entity name
+2025-11-23 10:40:09 DEBUG Leaving create_login function
+2025-11-23 10:40:12 DEBUG User wants to create a login entry
+2025-11-23 10:40:12 DEBUG Prompting user for entity name
+2025-11-23 10:40:54 DEBUG Prompting user for site name
+2025-11-23 10:41:27 DEBUG Prompting user for username
+2025-11-23 10:41:37 DEBUG Prompting user for password length
+2025-11-23 10:41:38 INFO Sanitizing the entity name
+2025-11-23 10:41:38 INFO Sanitizing the site name
+2025-11-23 10:41:38 INFO Sanitizing the username
+2025-11-23 10:41:38 INFO Uploading the new login to the Database
+2025-11-23 10:41:59 CRITICAL Vault was not accessible! Possibly the Vault file was not found!
+2025-11-23 10:41:59 DEBUG Database Watchdog stopped
+2025-11-23 10:42:33 INFO Starting My$PM
+2025-11-23 10:42:33 INFO Starting Database watchdog
+2025-11-23 10:42:33 DEBUG Checking if Master User exists
+2025-11-23 10:42:33 INFO Starting Master User Authentication
+2025-11-23 10:42:33 DEBUG Prompting for Master Username
+2025-11-23 10:43:32 DEBUG Prompting for Master Password
+2025-11-23 10:43:32 INFO Checking Master Login Credentials
+2025-11-23 10:43:32 DEBUG Session 900 seconds started
+2025-11-23 10:43:35 DEBUG User wants to find a login entry
+2025-11-23 10:43:35 DEBUG Prompting for site name user is looking for
+2025-11-23 10:43:52 DEBUG User opened a login entry
+2025-11-23 10:44:01 DEBUG User went back to search login entry
+2025-11-23 10:44:01 DEBUG Prompting for site name user is looking for
+2025-11-23 10:44:02 DEBUG User left find_login function
+2025-11-23 10:44:05 DEBUG Leaving the program
+2025-11-23 10:44:05 DEBUG Database Watchdog stopped
+2025-11-23 10:44:05 DEBUG Session Stopped

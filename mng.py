@@ -498,7 +498,6 @@ def edit_login(key, entity_name):
             if ays == "n":
                 return
 
-
             if new_entity_name != "":
                 logger.info("Sanitizing the new entity name")
                 new_entity_sanitized = entity_name_sanitize(new_entity_name)
@@ -522,7 +521,11 @@ def edit_login(key, entity_name):
                 password_encr = f.encrypt(password.encode())
                 logger.info("Applying password change")
                 db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
-                break
+            break
+        except ValueError:
+            clear()
+            logger.debug("User entered non integer type to set password length")
+            input("Please enter an integer to choose the length for the password... ")
         except sqlite3.OperationalError:
             clear()
             logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
@@ -611,10 +614,6 @@ def find_login(key):
         except (KeyboardInterrupt, EOFError):
             logger.debug("User left find_login function")
             break
-        except ValueError:
-            clear()
-            logger.debug("User entered non integer type in find_login")
-            input("Please enter an integer to choose the length for the password... ")
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
