@@ -624,18 +624,21 @@ def find_login(key):
 
 def master_auth():
     count = 0
-    match count:
-        case 0: timeout = 0
-        case 1: timeout = 60
-        case 2: timeout = 3600
-        case 3: timeout = 86400
-        case _: timeout = 60
     while True:
         clear()
+
+        match count:
+            case 0: timeout = 0
+            case 1: timeout = 60
+            case 2: timeout = 3600
+            case 3: timeout = 86400
+            case _: timeout = 86400
+
         logger.debug("Prompting for Master Username")
         username = input("Username: ")
         logger.debug("Prompting for Master Password")
         password = getpass.getpass()
+
         try:
             logger.info("Checking Master Login Credentials")
             query = db.run_query('''SELECT id, password_hash FROM users WHERE username = ?''', params=(username,))
@@ -647,6 +650,8 @@ def master_auth():
         except IndexError:
             logger.info("Entered Master Username does not exist")
             input("Wrong username or password. Please try again... ")
+            print(f"You have {count} number of attempts. Account throttled for {timeout} seconds")
+            logger.info(f"User has {count} number of attempts. Account throttled for {timeout} seconds")
             time.sleep(timeout)
             count += 1
         except MemoryError:
@@ -657,6 +662,8 @@ def master_auth():
         except argon2.exceptions.VerifyMismatchError:
             logger.info("Entered Master Password is incorrect")
             input("Wrong username or password. Please try again... ")
+            print(f"You have {count} number of attempts. Account throttled for {timeout} seconds")
+            logger.info(f"User has {count} number of attempts. Account throttled for {timeout} seconds")
             time.sleep(timeout)
             count += 1
 
