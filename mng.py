@@ -54,10 +54,6 @@ SITE_RE = re.compile(rf"^[A-Za-z0-9._:/@+\- ]{{1,{MAX_SITE_NAME}}}$")
 USERNAME_RE = re.compile(rf"^[A-Za-z0-9_.@+\-]{{1,{MAX_USERNAME}}}$")
 MASTER_PASSWORD_RE = re.compile(fr"^[A-Za-z0-9!@#$%\^&*\-_=+\.,<>?]{{1,{MAX_MASTER_PASSWORD}}}$")
 
-#ENTITY_RE = re.compile(r"^[A-Za-z0-9_\-\. ]{1,%d}$" % MAX_ENTITY_NAME)   # letters, digits, _, -, ., space
-#SITE_RE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$")  # basic domain check
-#USERNAME_RE = re.compile(r"^[A-Za-z0-9_.@+\-]{1,%d}$" % MAX_USERNAME)  # allow email like chars
-
 # For Argon2ID
 time_cost = 2          # Number of iterations
 memory_cost = 102400   # 100 MB in KiB
@@ -312,16 +308,19 @@ def create_master_user():
             clear()
             logger.debug("User left the program while creating Master User account")
             print("Leaving the program")
+            logger.debug("Database Watchdog stopped")
             sys.exit(0)
         except sqlite3.OperationalError:
             clear()
             logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
             print("Please check the if the Vault was altered! It seems that it was removed")
+            logger.debug("Database Watchdog stopped")
             os._exit(1)
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
+            logger.debug("Database Watchdog stopped")
             os._exit(1)
         except (EmptyInput, LongUsername, LongMasterPassword, InvalidUsernameInput, InvalidMasterPassInput) as e:
             clear()
@@ -416,6 +415,7 @@ def create_login(user_id, key):
             clear()
             logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
             print("Please check the if the Vault was altered! It seems that it was removed")
+            logger.debug("Database Watchdog stopped")
             sys.exit(0)
         except (KeyboardInterrupt, EOFError):
             clear()
@@ -425,6 +425,7 @@ def create_login(user_id, key):
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
+            logger.debug("Database Watchdog stopped")
             os._exit(1)
         except (EmptyInput, LongEntityName, LongSiteName, LongUsername) as e:
             clear()
@@ -469,11 +470,13 @@ def delete_login(entity_name):
         clear()
         logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
         print("Please check the if the Vault was altered! It seems that it was removed")
+        logger.debug("Database Watchdog stopped")
         sys.exit(1)
     except MemoryError:
         clear()
         logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
         input(f"Memory Overload Error! Please press enter to continue... ")
+        logger.debug("Database Watchdog stopped")
         os._exit(1)
 
 
@@ -524,11 +527,13 @@ def edit_login(key, entity_name):
             clear()
             logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
             print("Please check the if the Vault was altered! It seems that it was removed")
+            logger.debug("Database Watchdog stopped")
             sys.exit(1)
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
+            logger.debug("Database Watchdog stopped")
             os._exit(1)
         except (EmptyInput, LongEntityName, LongSiteName, LongUsername) as e:
             clear()
@@ -614,11 +619,13 @@ def find_login(key):
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
+            logger.debug("Database Watchdog stopped")
             os._exit(1)
         except sqlite3.OperationalError:
             clear()
             logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
             print("Please check the if the Vault was altered! It seems that it was removed")
+            logger.debug("Database Watchdog stopped")
             sys.exit(1)
 
 
@@ -646,6 +653,7 @@ def master_auth():
             ph.verify(stored_pwd, password)
             key = derive_key(username, password)
             return user_id, key
+            logger.info("Master User Successful Login!")
             break
         except IndexError:
             logger.info("Entered Master Username does not exist")
@@ -658,6 +666,7 @@ def master_auth():
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
+            logger.debug("Database Watchdog stopped")
             os._exit(1)
         except argon2.exceptions.VerifyMismatchError:
             logger.info("Entered Master Password is incorrect")
@@ -667,7 +676,6 @@ def master_auth():
             time.sleep(timeout)
             count += 1
 
-    logger.info("Master User Successful Login!")
 
 def session_limit(timeout, stop_timer):
     start_time = time.time()
@@ -676,17 +684,19 @@ def session_limit(timeout, stop_timer):
             clear()
             logger.info("Session expired due to timeout. Exiting My$PM")
             print("Session timeout!")
+            logger.debug("Database Watchdog stopped")
             os._exit(0)
         time.sleep(1)
 
-def db_watchdog(db_path, stop_event):
-    while not stop_event.is_set():
+def db_watchdog(db_path):
+    while True:
         if not os.path.exists(db_path):
             clear()
             logger.critical("Vault was not accessible! Possibly the Vault file was not found!")
             print("CRITICAL ERROR: Vault file missing!\n"
                   "The password database cannot be found.\n"
                   "Exiting immediately for security.")
+            logger.debug("Database Watchdog stopped")
             os._exit(1)   # force-quit for security
         time.sleep(1)  # small interval, low CPU
 
@@ -694,13 +704,6 @@ def main():
     while True:
         clear()
         stop_event = threading.Event()
-        watchdog_thread = threading.Thread(
-                target=db_watchdog,
-                daemon=True,
-                args=(db.db, stop_event)
-        )
-        logger.info("Starting Database watchdog")
-        watchdog_thread.start()
         logger.debug("Checking if Master User exists")
         master_exists = check_master_user()
         if master_exists is False:
@@ -714,6 +717,7 @@ def main():
         except (KeyboardInterrupt, EOFError):
             clear()
             logger.debug("Leaving the program")
+            logger.debug("Database Watchdog stopped")
             sys.exit(0)
 
         SESSION_TIMEOUT = 900
@@ -753,20 +757,29 @@ def main():
                         input("You have to choose smth... ")
         except (KeyboardInterrupt, EOFError):
             clear()
-            break
+            logger.debug("Leaving the program")
+            logger.debug("Database Watchdog stopped")
+            sys.exit(0)
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
             input(f"Memory Overload Error! Please press enter to continue... ")
+            logger.debug("Database Watchdog stopped")
             os._exit(1)
         finally:
             stop_event.set()
             timer_thread.join(timeout=1)
             logger.debug("Session Stopped")
-            watchdog_thread.join(timeout=1)
-            logger.debug("Database Watchdog stopped")
+            #watchdog_thread.join(timeout=1)
 
 
 if __name__ == "__main__":
     logger.info("Starting My$PM")
+    watchdog_thread = threading.Thread(
+            target=db_watchdog,
+            daemon=True,
+            args=(db.db,)
+    )
+    logger.info("Starting Database watchdog")
+    watchdog_thread.start()
     main()
