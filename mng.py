@@ -17,6 +17,8 @@ import argon2
 import argon2.exceptions
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+import hashlib
+import hmac
 
 # General understanding of the difference between hashing and encryption https://pagorun.medium.com/password-encryption-in-python-securing-your-data-9e0045e039e1
 
@@ -242,6 +244,38 @@ def clear():
         os.system("clear")
 
 
+def db_hmac_gen(hmac_key, db_path):
+    with open(db_path, "rb") as f:
+        data = f.read()
+    return hmac.new(hmac_key, data, hashlib.sha256).digest()
+
+
+def db_hmac_write(hmac_key, db_path):
+    tag = db_hmac_gen(hmac_key, db_path)
+    with open(db_path + ".hmac", "wb") as f:
+        f.write(tag)
+    os.chmod(db_path + ".hmac", 0o600)
+
+
+def db_hmac_vrf(hmac_key, db_path):
+    try:
+        with open(db_path + ".hmac", "rb") as f:
+            stored = f.read()
+    except FileNotFoundError:
+        clear()
+        logger.critical("Integrity check file missing!")
+        print("Integrity check file missing!")
+        os._exit(1)
+
+    expected = db_hmac_gen(hmac_key, db_path)
+
+    if not hmac.compare_digest(stored, expected):
+        clear()
+        logger.critical("Vault was altered! Integrity check failed")
+        print("Vault was altered! Integrity check failed")
+        os._exit(1)
+
+
 def entity_name_sanitize(userinput: str):
     if userinput == "":
         raise EmptyInput()
@@ -268,7 +302,7 @@ def username_sanitize(userinput: str):
     if userinput == "":
         raise EmptyInput()
     if len(userinput) > MAX_USERNAME:
-        raise LongUserName()
+        raise LongUsername()
     if USERNAME_RE.fullmatch(userinput) is None:
         raise InvalidUsernameInput()
 
@@ -319,7 +353,7 @@ def create_master_user():
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
-            input(f"Memory Overload Error! Please press enter to continue... ")
+            input("Memory Overload Error! Please press enter to continue... ")
             logger.debug("Database Watchdog stopped")
             os._exit(1)
         except (EmptyInput, LongUsername, LongMasterPassword, InvalidUsernameInput, InvalidMasterPassInput) as e:
@@ -352,6 +386,14 @@ def derive_key(username, password):
     return key
 
 
+def derive_encr_key(master_key):
+    return hashlib.sha256(master_key + b'_Master_User_Encr_Key_').digest()
+
+
+def derive_hmac_key(master_key):
+    return hashlib.sha256(master_key + b'_Master_User_HMAC_Key_').digest()
+
+
 def password_gen(length):
     # The following code snipplet was taken from: https://www.geeksforgeeks.org/python/secrets-python-module-generate-secure-random-numbers/
     # and refined by ChatGPT
@@ -372,10 +414,11 @@ def password_gen(length):
             break
 
 
-def create_login(user_id, key):
+def create_login(user_id, encr_key, hmac_key):
     while True:
         clear()
         try:
+            db_hmac_vrf(hmac_key, db.db)
             print(f"{guide}\n")
             logger.debug("Prompting user for entity name")
             entity_name = input("Please give a short and unique name for the entry: ").strip()
@@ -392,7 +435,7 @@ def create_login(user_id, key):
             password = password_gen(int(length))
             # Fernet algorythm code snipplet reference: https://cryptography.io/en/latest/fernet/#using-passwords-with-fernet
             # https://stackoverflow.com/questions/27335726/how-do-i-encrypt-and-decrypt-a-string-in-python
-            f = Fernet(base64.urlsafe_b64encode(key))
+            f = Fernet(base64.urlsafe_b64encode(encr_key))
             password_encr = f.encrypt(password.encode())
             logger.info("Sanitizing the entity name")
             entity_name_sanitized = entity_name_sanitize(entity_name)
@@ -402,6 +445,8 @@ def create_login(user_id, key):
             username_sanitized = username_sanitize(username)
             logger.info("Uploading the new login to the Database")
             db.run_change('''INSERT INTO logins (user_id, entity_name, site_name, username, password_encr) VALUES (?, ?, ?, ?, ?)''', params=(user_id, entity_name_sanitized, site_sanitized, username_sanitized, password_encr))
+            db_hmac_write(hmac_key, db.db)
+            db_hmac_vrf(hmac_key, db.db)
             break
         except ValueError:
             clear()
@@ -424,7 +469,7 @@ def create_login(user_id, key):
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
-            input(f"Memory Overload Error! Please press enter to continue... ")
+            input("Memory Overload Error! Please press enter to continue... ")
             logger.debug("Database Watchdog stopped")
             os._exit(1)
         except (EmptyInput, LongEntityName, LongSiteName, LongUsername) as e:
@@ -437,9 +482,9 @@ def create_login(user_id, key):
             input(f"{e}. Please press enter to continue... ")
 
 
-def copy_login(key, password_encr):
+def copy_login(encr_key, password_encr):
     clear()
-    f = Fernet(base64.urlsafe_b64encode(key))
+    f = Fernet(base64.urlsafe_b64encode(encr_key))
     try:
         pyperclip.copy(f.decrypt(password_encr).decode("utf-8"))
         logger.info("Password copied to clipboard, starting 8 second counter")
@@ -453,9 +498,10 @@ def copy_login(key, password_encr):
         input("Please press enter to continue... ")
 
 
-def delete_login(entity_name):
+def delete_login(hmac_key, entity_name):
     clear()
     try:
+        db_hmac_vrf(hmac_key, db.db)
         logger.info("Asking whether user is sure with the deletion")
         ays = input("Are you sure that you want to delete this? Ones deleted, you will not be able to recover this(y/n): ")
         if ays.lower() == "y":
@@ -464,6 +510,8 @@ def delete_login(entity_name):
             if enterDELETE == "DELETE":
                 logger.info("Deleting login from the Database")
                 db.run_change('''DELETE FROM logins WHERE entity_name = ?''', params=(entity_name,))
+                db_hmac_write(hmac_key, db.db)
+                db_hmac_vrf(hmac_key, db.db)
             return
         return
     except sqlite3.OperationalError:
@@ -475,15 +523,16 @@ def delete_login(entity_name):
     except MemoryError:
         clear()
         logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
-        input(f"Memory Overload Error! Please press enter to continue... ")
+        input("Memory Overload Error! Please press enter to continue... ")
         logger.debug("Database Watchdog stopped")
         os._exit(1)
 
 
-def edit_login(key, entity_name):
+def edit_login(encr_key, hmac_key, entity_name):
     while True:
         clear()
         try:
+            db_hmac_vrf(hmac_key, db.db)
             print(edit_msg)
             logger.debug("Prompting user for new entity name")
             new_entity_name = input("Entity Name: ").strip()
@@ -503,24 +552,32 @@ def edit_login(key, entity_name):
                 new_entity_sanitized = entity_name_sanitize(new_entity_name)
                 logger.info("Applying entity name change")
                 db.run_change('''UPDATE logins SET entity_name = ? WHERE entity_name = ?''', params=(new_entity_sanitized, entity_name))
+                db_hmac_write(hmac_key, db.db)
+                db_hmac_vrf(hmac_key, db.db)
             if new_site != "":
                 logger.info("Sanitizing the new site name")
-                new_site_name = site_name_sanitize(new_site)
+                new_site_name = site_sanitize(new_site)
                 logger.info("Applying site name change")
                 db.run_change('''UPDATE logins SET site_name = ? WHERE entity_name = ?''', params=(new_site_sanitized, entity_name))
+                db_hmac_write(hmac_key, db.db)
+                db_hmac_vrf(hmac_key, db.db)
             if new_username != "":
                 logger.info("Sanitizing the new username")
                 new_username_sanitized = username_sanitize(new_username)
                 logger.info("Applying username change")
                 db.run_change('''UPDATE logins SET username = ? WHERE entity_name = ?''', params=(new_username_sanitized, entity_name))
+                db_hmac_write(hmac_key, db.db)
+                db_hmac_vrf(hmac_key, db.db)
             if new_password_len != "":
                 if int(new_password_len) < 10 or int(new_password_len) > 22:
                     length = 10
                 password = password_gen(int(new_password_len))
-                f = Fernet(base64.urlsafe_b64encode(key))
+                f = Fernet(base64.urlsafe_b64encode(encr_key))
                 password_encr = f.encrypt(password.encode())
                 logger.info("Applying password change")
                 db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
+                db_hmac_write(hmac_key, db.db)
+                db_hmac_vrf(hmac_key, db.db)
             break
         except ValueError:
             clear()
@@ -535,7 +592,7 @@ def edit_login(key, entity_name):
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
-            input(f"Memory Overload Error! Please press enter to continue... ")
+            input("Memory Overload Error! Please press enter to continue... ")
             logger.debug("Database Watchdog stopped")
             os._exit(1)
         except (EmptyInput, LongEntityName, LongSiteName, LongUsername) as e:
@@ -548,7 +605,7 @@ def edit_login(key, entity_name):
             input(f"{e}. Please press enter to continue... ")
 
 
-def find_login(key):
+def find_login(encr_key, hmac_key):
     while True:
         clear()
         try:
@@ -585,14 +642,14 @@ def find_login(key):
                         match find_action_choice:
                             case "1":
                                 logger.debug("User wants to copy the password")
-                                copy_login(key, password_encr)
+                                copy_login(encr_key, password_encr)
                             case "2":
                                 logger.debug("User wants to delete the login entry")
-                                delete_login(entity_name)
+                                delete_login(hmac_key, entity_name)
                                 break
                             case "3":
                                 logger.debug("User wants to edit the login entry")
-                                edit_login(key, entity_name)
+                                edit_login(encr_key, hmac_key, entity_name)
                                 break
                             case ".":
                                 logger.debug("User went back to search login entry")
@@ -617,7 +674,7 @@ def find_login(key):
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
-            input(f"Memory Overload Error! Please press enter to continue... ")
+            input("Memory Overload Error! Please press enter to continue... ")
             logger.debug("Database Watchdog stopped")
             os._exit(1)
         except sqlite3.OperationalError:
@@ -650,8 +707,10 @@ def master_auth():
             query = db.run_query('''SELECT id, password_hash FROM users WHERE username = ?''', params=(username,))
             user_id, stored_pwd = query[0]
             ph.verify(stored_pwd, password)
-            key = derive_key(username, password)
-            return user_id, key
+            master_key = derive_key(username, password)
+            encr_key = derive_encr_key(master_key)
+            hmac_key = derive_hmac_key(master_key)
+            return user_id, encr_key, hmac_key
             logger.info("Master User Successful Login!")
             break
         except IndexError:
@@ -664,7 +723,7 @@ def master_auth():
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
-            input(f"Memory Overload Error! Please press enter to continue... ")
+            input("Memory Overload Error! Please press enter to continue... ")
             logger.debug("Database Watchdog stopped")
             os._exit(1)
         except argon2.exceptions.VerifyMismatchError:
@@ -699,6 +758,15 @@ def db_watchdog(db_path):
             os._exit(1)   # force-quit for security
         time.sleep(1)  # small interval, low CPU
 
+
+def is_db_empty():
+    try:
+        count = db.run_query('''SELECT COUNT(*) FROM logins''')[0][0]
+        return count == 0
+    except Exception:
+        return False
+
+
 def main():
     while True:
         clear()
@@ -712,12 +780,23 @@ def main():
             clear()
         try:
             logger.info("Starting Master User Authentication")
-            user_id, encr_key = master_auth()
+            user_id, encr_key, hmac_key = master_auth()
         except (KeyboardInterrupt, EOFError):
             clear()
             logger.debug("Leaving the program")
             logger.debug("Database Watchdog stopped")
             sys.exit(0)
+
+        if not os.path.exists(db.db + ".hmac"):
+            if is_db_empty():
+                logger.info("Empty vault detected, creating initial HMAC.")
+                db_hmac_write(hmac_key, db.db)
+            else:
+                logger.critical("Missing HMAC file on non-empty DB — tampering suspected!")
+                print("CRITICAL ERROR: Vault integrity compromised.")
+                os._exit(1)
+        else:
+            db_hmac_vrf(hmac_key, db.db)
 
         SESSION_TIMEOUT = 900
         timer_thread = threading.Thread(
@@ -742,11 +821,11 @@ def main():
                     case "1":
                         clear()
                         logger.debug("User wants to create a login entry")
-                        create_login(user_id, encr_key)
+                        create_login(user_id, encr_key, hmac_key)
                     case "2":
                         clear()
                         logger.debug("User wants to find a login entry")
-                        find_login(encr_key)
+                        find_login(encr_key, hmac_key)
                     case ".":
                         clear()
                         logger.debug("Logging out")
@@ -758,11 +837,12 @@ def main():
             clear()
             logger.debug("Leaving the program")
             logger.debug("Database Watchdog stopped")
+            db_hmac_vrf(hmac_key, db.db)
             sys.exit(0)
         except MemoryError:
             clear()
             logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
-            input(f"Memory Overload Error! Please press enter to continue... ")
+            input("Memory Overload Error! Please press enter to continue... ")
             logger.debug("Database Watchdog stopped")
             os._exit(1)
         finally:
