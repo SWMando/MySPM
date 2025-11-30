@@ -87,7 +87,10 @@ Then download all the required libraries to run the `My$PM`:
 pip install -r requirements.txt
 ```
 
-For security purposes be sure that the python file `mng.py` has permissions set to `700`, so that only your user is able to run the program
+For security purposes be sure that the python file `mng.py` has permissions set to `700`, so that only your user is able to run the program. To change the permission to `700`, run:
+```shell
+chmod 700 mng.py
+```
 
 After installing all dependencies and activating your virtual environment, you can start My$PM using:
 

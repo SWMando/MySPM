@@ -420,8 +420,16 @@ def create_master_user():
             logger.error(e)
             input(f"{e}. Please press enter to continue... ")
 
-    logger.info("Hashing the password")
-    password_hash = hash_password(master_password_sanitized)
+    try:
+        logger.info("Hashing the password")
+        password_hash = hash_password(master_password_sanitized)
+    except MemoryError:
+        clear()
+        logger.critical("Memory was overloaded! Possibly there was a long input from the USER!")
+        input("Memory Overload Error! Please press enter to continue... ")
+        logger.debug("Database Watchdog stopped")
+        os._exit(1)
+
     salt = os.urandom(16)
     logger.info("Uploading newly created Master User to the Database")
     db.run_change('''INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?) ''', params=(master_user_sanititzed, password_hash, salt))
