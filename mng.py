@@ -45,6 +45,9 @@ opt = {
     ".": "To leave press"
 }
 
+# Changing the default umask
+os.umask(0o077)
+
 # For Input Sanitization
 MAX_USERNAME = 64
 MAX_ENTITY_NAME = 64
@@ -122,16 +125,22 @@ if not os.path.exists(vaultDir):
     os.mkdir(vaultDir, mode)
 
 # Logging
+# https://realpython.com/python-logging/
+# https://www.youtube.com/watch?v=9L77QExPmI0
+# https://medium.com/@tyrel.j.johnson/useful-tips-for-logging-in-python-c2c945358b5e
+# https://www.youtube.com/watch?v=urrfJgHwIJA
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-log_format = logging.Formatter(
+log_format = logging.Formatter( # https://last9.io/blog/syslog-formats/
     '{asctime} {levelname} {message}',
     datefmt='%Y-%m-%d %H:%M:%S',
     style='{'
 )
 
+# Fixed by AI
 # ROTATION HANDLER (SIZE-BASED)
-file_handler = RotatingFileHandler(
+file_handler = RotatingFileHandler( # https://docs.python.org/3/library/logging.handlers.html#rotatingfilehandler
     "myspm_logs/mng.log",
     maxBytes=100_000_000,     # 100MB per file
     backupCount=10,         # keep 10 old log files
