@@ -1,24 +1,28 @@
-import os
-import sys
-import re
-import string
-import secrets # https://www.geeksforgeeks.org/python/secrets-python-module-generate-secure-random-numbers/
-import time
-import threading
-import base64
-import getpass # https://www.geeksforgeeks.org/python/getpass-and-getuser-in-python-password-without-echo/
-import platform
-import pyperclip
-from logging.handlers import RotatingFileHandler
-import logging
-import sqlite3 # https://www.geeksforgeeks.org/python/python-sqlite-cursor-object/
-from tabulate import tabulate
-import argon2
-import argon2.exceptions
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
-import hashlib
-import hmac
+try:
+    import os
+    import sys
+    import re
+    import string
+    import secrets # https://www.geeksforgeeks.org/python/secrets-python-module-generate-secure-random-numbers/
+    import time
+    import threading
+    import base64
+    import getpass # https://www.geeksforgeeks.org/python/getpass-and-getuser-in-python-password-without-echo/
+    import platform
+    import pyperclip
+    from logging.handlers import RotatingFileHandler
+    import logging
+    import sqlite3 # https://www.geeksforgeeks.org/python/python-sqlite-cursor-object/
+    from tabulate import tabulate
+    import argon2
+    import argon2.exceptions
+    from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+    import hashlib
+    import hmac
+except ModuleNotFoundError as e:
+    print(f"{e}. Please run `pip install -r requirements.txt`")
+    exit(1)
 
 # General understanding of the difference between hashing and encryption https://pagorun.medium.com/password-encryption-in-python-securing-your-data-9e0045e039e1
 
@@ -44,6 +48,14 @@ opt = {
     "2": "Find Login",
     ".": "To leave press"
 }
+
+
+def clear():
+    if platform.system() == "Windows":
+        os.system("cls")
+    else:
+        os.system("clear")
+
 
 # Changing the default umask
 os.umask(0o077)
@@ -72,46 +84,68 @@ class DB:
         self.db = 'Vault/Vault.db'
         self.permission = 0o600
         if not os.path.exists(self.db):
-            with sqlite3.connect(self.db) as conn:
-                c = conn.cursor()
+            try:
+                with sqlite3.connect(self.db) as conn:
+                    c = conn.cursor()
 
-                # Secure users table
-                c.execute('''
-                    CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        username TEXT UNIQUE NOT NULL,
-                        password_hash TEXT NOT NULL,         -- store hashed password, never plaintext
-                        salt BLOB NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                c.execute('''
-                    CREATE TABLE IF NOT EXISTS logins (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
-                        entity_name TEXT UNIQUE NOT NULL,
-                        site_name TEXT NOT NULL,
-                        username TEXT NOT NULL,
-                        password_encr BLOB NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                    )
-                ''')
+                    # Secure users table
+                    c.execute('''
+                        CREATE TABLE IF NOT EXISTS users (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            username TEXT UNIQUE NOT NULL,
+                            password_hash TEXT NOT NULL,         -- store hashed password, never plaintext
+                            salt BLOB NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    ''')
+                    c.execute('''
+                        CREATE TABLE IF NOT EXISTS logins (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER NOT NULL,
+                            entity_name TEXT UNIQUE NOT NULL,
+                            site_name TEXT NOT NULL,
+                            username TEXT NOT NULL,
+                            password_encr BLOB NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                        )
+                    ''')
 
-                conn.commit()
+                    conn.commit()
+            except sqlite3.OperationalError:
+                clear()
+                logger.critical("Vault was not accessible! Check whether the database exists. If it does, please check the permissions!")
+                print("Vault was not accessible! Check whether the database exists. If it does, please check the permissions!")
+                logger.debug("Database Watchdog stopped")
+                os._exit(1)
+
             os.chmod(self.db, self.permission)
 
     def run_query(self, query, params=()):
-        with sqlite3.connect(self.db) as conn:
-            c = conn.cursor()
-            c.execute(query, params)
-            return c.fetchall()
+        try:
+            with sqlite3.connect(self.db) as conn:
+                c = conn.cursor()
+                c.execute(query, params)
+                return c.fetchall()
+        except sqlite3.OperationalError:
+            clear()
+            logger.critical("Vault was not accessible! Check whether the database exists. If it does, please check the permissions!")
+            print("Vault was not accessible! Check whether the database exists. If it does, please check the permissions!")
+            logger.debug("Database Watchdog stopped")
+            os._exit(1)
 
     def run_change(self, query, params=()):
-        with sqlite3.connect(self.db) as conn:
-            c = conn.cursor()
-            c.execute(query, params)
-            conn.commit()
+        try:
+            with sqlite3.connect(self.db) as conn:
+                c = conn.cursor()
+                c.execute(query, params)
+                conn.commit()
+        except sqlite3.OperationalError:
+            clear()
+            logger.critical("Vault was not accessible! Check whether the database exists. If it does, please check the permissions!")
+            print("Vault was not accessible! Check whether the database exists. If it does, please check the permissions!")
+            logger.debug("Database Watchdog stopped")
+            os._exit(1)
 
 
 # Essential Directories
@@ -140,16 +174,24 @@ log_format = logging.Formatter( # https://last9.io/blog/syslog-formats/
 
 # Fixed by AI
 # ROTATION HANDLER (SIZE-BASED)
-file_handler = RotatingFileHandler( # https://docs.python.org/3/library/logging.handlers.html#rotatingfilehandler
-    "myspm_logs/mng.log",
-    maxBytes=100_000_000,     # 100MB per file
-    backupCount=10,         # keep 10 old log files
-)
+
+try:
+    file_handler = RotatingFileHandler( # https://docs.python.org/3/library/logging.handlers.html#rotatingfilehandler
+        "myspm_logs/mng.log",
+        maxBytes=100_000_000,     # 100MB per file
+        backupCount=10,         # keep 10 old log files
+    )
+except PermissionError:
+    clear()
+    print("CRITICAL: CAN NOT ACCESS THE LOGS!")
+    os._exit(1)
 
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(log_format)
 
 logger.addHandler(file_handler)
+
+
 
 db = DB()
 
@@ -246,16 +288,18 @@ class InvalidMasterPassInput(Exception):
 #---------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------
-def clear():
-    if platform.system() == "Windows":
-        os.system("cls")
-    else:
-        os.system("clear")
 
 
 def db_hmac_gen(hmac_key, db_path):
-    with open(db_path, "rb") as f:
-        data = f.read()
+    try:
+        with open(db_path, "rb") as f:
+            data = f.read()
+    except PermissionError:
+        clear()
+        logger.critical("Vault HMAC file was not accessible! Please check the permissions set on the Vault HMAC file!")
+        print("Vault HMAC file was not accessible! Please check the permissions set on the Vault HMAC file!")
+        logger.debug("Database Watchdog stopped")
+        os._exit(1)
     return hmac.new(hmac_key, data, hashlib.sha256).digest()
 
 
@@ -274,6 +318,12 @@ def db_hmac_vrf(hmac_key, db_path):
         clear()
         logger.critical("Integrity check file missing!")
         print("Integrity check file missing!")
+        os._exit(1)
+    except PermissionError:
+        clear()
+        logger.critical("Vault HMAC file was not accessible! Please check the permissions set on the Vault HMAC file!")
+        print("Vault HMAC file was not accessible! Please check the permissions set on the Vault HMAC file!")
+        logger.debug("Database Watchdog stopped")
         os._exit(1)
 
     expected = db_hmac_gen(hmac_key, db_path)
@@ -453,10 +503,19 @@ def create_login(user_id, encr_key, hmac_key):
             logger.info("Sanitizing the username")
             username_sanitized = username_sanitize(username)
             logger.info("Uploading the new login to the Database")
-            db.run_change('''INSERT INTO logins (user_id, entity_name, site_name, username, password_encr) VALUES (?, ?, ?, ?, ?)''', params=(user_id, entity_name_sanitized, site_sanitized, username_sanitized, password_encr))
-            db_hmac_write(hmac_key, db.db)
-            db_hmac_vrf(hmac_key, db.db)
+            if not os.access(db.db + ".hmac", os.W_OK):
+                raise PermissionError
+            else:
+                db.run_change('''INSERT INTO logins (user_id, entity_name, site_name, username, password_encr) VALUES (?, ?, ?, ?, ?)''', params=(user_id, entity_name_sanitized, site_sanitized, username_sanitized, password_encr))
+                db_hmac_write(hmac_key, db.db)
+                db_hmac_vrf(hmac_key, db.db)
             break
+        except PermissionError:
+            clear()
+            logger.critical("Vault HMAC file was not accessible! Please check the permissions set on the Vault HMAC file!")
+            print("Vault HMAC file was not accessible! Please check the permissions set on the Vault HMAC file!")
+            logger.debug("Database Watchdog stopped")
+            os._exit(1)
         except ValueError:
             clear()
             logger.error("User tried passing non integer type to password length input")
@@ -505,6 +564,9 @@ def copy_login(encr_key, password_encr):
         logger.info("User stopped the process, clearing the keyboard")
         pyperclip.copy('')
         input("Please press enter to continue... ")
+    except PyperclipException as e:
+        logger.error(f"{e}. Please check if you have one of these packages installed: xclip, xsel, wl-copy or wl-paste, pbcopy or pbpaste")
+        print("Can not copy to the clipboard! Please check if you have one of these packages installed: xclip, xsel, wl-copy or wl-paste, pbcopy or pbpaste")
 
 
 def delete_login(hmac_key, entity_name):
@@ -518,9 +580,12 @@ def delete_login(hmac_key, entity_name):
             enterDELETE = input("Please enter \"DELETE\": ")
             if enterDELETE == "DELETE":
                 logger.info("Deleting login from the Database")
-                db.run_change('''DELETE FROM logins WHERE entity_name = ?''', params=(entity_name,))
-                db_hmac_write(hmac_key, db.db)
-                db_hmac_vrf(hmac_key, db.db)
+                if not os.access(db.db + ".hmac", os.W_OK):
+                    raise PermissionError
+                else:
+                    db.run_change('''DELETE FROM logins WHERE entity_name = ?''', params=(entity_name,))
+                    db_hmac_write(hmac_key, db.db)
+                    db_hmac_vrf(hmac_key, db.db)
             return
         return
     except sqlite3.OperationalError:
@@ -560,23 +625,32 @@ def edit_login(encr_key, hmac_key, entity_name):
                 logger.info("Sanitizing the new entity name")
                 new_entity_sanitized = entity_name_sanitize(new_entity_name)
                 logger.info("Applying entity name change")
-                db.run_change('''UPDATE logins SET entity_name = ? WHERE entity_name = ?''', params=(new_entity_sanitized, entity_name))
-                db_hmac_write(hmac_key, db.db)
-                db_hmac_vrf(hmac_key, db.db)
+                if not os.access(db.db + ".hmac", os.W_OK):
+                    raise PermissionError
+                else:
+                    db.run_change('''UPDATE logins SET entity_name = ? WHERE entity_name = ?''', params=(new_entity_sanitized, entity_name))
+                    db_hmac_write(hmac_key, db.db)
+                    db_hmac_vrf(hmac_key, db.db)
             if new_site != "":
                 logger.info("Sanitizing the new site name")
                 new_site_name = site_sanitize(new_site)
                 logger.info("Applying site name change")
-                db.run_change('''UPDATE logins SET site_name = ? WHERE entity_name = ?''', params=(new_site_sanitized, entity_name))
-                db_hmac_write(hmac_key, db.db)
-                db_hmac_vrf(hmac_key, db.db)
+                if not os.access(db.db + ".hmac", os.W_OK):
+                    raise PermissionError
+                else:
+                    db.run_change('''UPDATE logins SET site_name = ? WHERE entity_name = ?''', params=(new_site_sanitized, entity_name))
+                    db_hmac_write(hmac_key, db.db)
+                    db_hmac_vrf(hmac_key, db.db)
             if new_username != "":
                 logger.info("Sanitizing the new username")
                 new_username_sanitized = username_sanitize(new_username)
                 logger.info("Applying username change")
-                db.run_change('''UPDATE logins SET username = ? WHERE entity_name = ?''', params=(new_username_sanitized, entity_name))
-                db_hmac_write(hmac_key, db.db)
-                db_hmac_vrf(hmac_key, db.db)
+                if not os.access(db.db + ".hmac", os.W_OK):
+                    raise PermissionError
+                else:
+                    db.run_change('''UPDATE logins SET username = ? WHERE entity_name = ?''', params=(new_username_sanitized, entity_name))
+                    db_hmac_write(hmac_key, db.db)
+                    db_hmac_vrf(hmac_key, db.db)
             if new_password_len != "":
                 if int(new_password_len) < 10 or int(new_password_len) > 22:
                     length = 10
@@ -584,10 +658,19 @@ def edit_login(encr_key, hmac_key, entity_name):
                 f = Fernet(base64.urlsafe_b64encode(encr_key))
                 password_encr = f.encrypt(password.encode())
                 logger.info("Applying password change")
-                db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
-                db_hmac_write(hmac_key, db.db)
-                db_hmac_vrf(hmac_key, db.db)
+                if not os.access(db.db + ".hmac", os.W_OK):
+                    raise PermissionError
+                else:
+                    db.run_change('''UPDATE logins SET password_encr = ? WHERE entity_name = ?''', params=(password_encr, entity_name))
+                    db_hmac_write(hmac_key, db.db)
+                    db_hmac_vrf(hmac_key, db.db)
             break
+        except PermissionError:
+            clear()
+            logger.critical("Vault HMAC file was not accessible! Please check the permissions set on the Vault HMAC file!")
+            print("Vault HMAC file was not accessible! Please check the permissions set on the Vault HMAC file!")
+            logger.debug("Database Watchdog stopped")
+            os._exit(1)
         except ValueError:
             clear()
             logger.debug("User entered non integer type to set password length")
